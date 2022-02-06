@@ -1,6 +1,6 @@
-path<-"./phenocam/"
-source(paste0(path, "code/steps/01 utils.R"))
-source(paste0(path, "code/steps/02 settings.R"))
+path<-"./phenology/"
+source(paste0(path, "code/01 utils.R"))
+source(paste0(path, "code/02 settings.R"))
 
 Sys.setenv(CURL_CA_BUNDLE = file.path(Sys.getenv("R_HOME"), "lib/microsoft-r-cacert.pem"))
 rois_df<-get_rois() 
@@ -22,27 +22,27 @@ cl <- makeCluster(num_part, outfile = "")
 registerDoSNOW(cl)
 
 stats_list<-vector(mode="list", length=nrow(rois_df_select))
-for (r in 1:nrow(rois_df_select)) {
+for (r in 27:nrow(rois_df_select)) {
   type<-rois_df_select$roitype[r]
   roi<-rois_df_select$roi_name[r]
   
   path_sub<-paste0(path, "archive/",type,"/",roi,"/")
   dir.create(path_sub, recursive = T)
-  source(paste0(path, "code/steps/14 get phenocam and daymet data.R"))
+  source(paste0(path, "code/11 get phenocam and daymet data.R"))
   
-  source(paste0(path, "code/steps/21 preprocess data.R"))
+  source(paste0(path, "code/21 preprocess data.R"))
   
   # use first half to train model
   midyear=2018
   
-  source(paste0(path, "code/steps/22 prepare embeddings.R"))
-  source(paste0(path, "code/steps/23 train GP model.R"))
+  source(paste0(path, "code/22 prepare embeddings.R"))
+  source(paste0(path, "code/23 train GP model.R"))
   
   # predict for whole duration
-  source(paste0(path, "code/steps/24 fit.R"))
+  source(paste0(path, "code/24 fit.R"))
   
   # output table and figure
-  source(paste0(path, "code/steps/25 output table and figure.R"))
+  source(paste0(path, "code/25 output table and figure.R"))
 }
 
 closeAllConnections()
@@ -99,7 +99,6 @@ t.test(mismatch_df %>% filter(stats=="RMSE") %>% filter(type=="AG") %>% pull(cha
        mismatch_df %>% filter(stats=="RMSE") %>% filter(type=="GR") %>% pull(change))
 t.test(mismatch_df %>% filter(stats=="corr") %>% filter(type=="AG") %>% pull(change),
        mismatch_df %>% filter(stats=="corr") %>% filter(type=="GR") %>% pull(change))
-
-# file <- c("./gpw_v4_population_density_rev11_30_min.nc")
-# Human <- brick(file)[[1]]
+t.test(mismatch_df %>% filter(stats=="R2") %>% filter(type=="AG") %>% pull(change),
+       mismatch_df %>% filter(stats=="R2") %>% filter(type=="GR") %>% pull(change))
  

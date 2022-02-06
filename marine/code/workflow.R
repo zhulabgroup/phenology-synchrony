@@ -206,6 +206,12 @@ p<-ggplot(sync_df)+
 print(p)
 dev.off()
 
+mean(sync_df %>% filter(management=="managed") %>% pull(decay))
+sd(sync_df %>% filter(management=="managed") %>% pull(decay))
+
+mean(sync_df %>% filter(management=="unmanaged") %>% pull(decay))
+sd(sync_df %>% filter(management=="unmanaged") %>% pull(decay))
+
 t.test(sync_df %>% filter(management=="managed") %>% pull(decay),
        sync_df %>% filter(management=="unmanaged") %>% pull(decay))
 
