@@ -2,10 +2,18 @@ path<-"./phenology/"
 source(paste0(path, "code/01 utils.R"))
 source(paste0(path, "code/02 settings.R"))
 
-Sys.setenv(CURL_CA_BUNDLE = file.path(Sys.getenv("R_HOME"), "lib/microsoft-r-cacert.pem"))
+# Sys.setenv(CURL_CA_BUNDLE = file.path(Sys.getenv("R_HOME"), "lib/microsoft-r-cacert.pem"))
 rois_df<-get_rois() 
 
-type_list<-c("AG", "GR")
+type_list<-rois_df %>% 
+  group_by(roitype) %>% 
+  summarise(n=n()) %>% 
+  arrange(desc(n)) %>% 
+  head(10) %>% 
+  pull(roitype)
+unique(rois_df$roitype)
+# type_list<-c("AG", "GR")
+
 rois_df_select<-rois_df %>% 
   filter(roitype%in%type_list) %>% 
   filter(first_date<=as.Date("2015-12-31")) %>% 
@@ -22,7 +30,7 @@ cl <- makeCluster(num_part, outfile = "")
 registerDoSNOW(cl)
 
 stats_list<-vector(mode="list", length=nrow(rois_df_select))
-for (r in 27:nrow(rois_df_select)) {
+for (r in 1:nrow(rois_df_select)) {
   type<-rois_df_select$roitype[r]
   roi<-rois_df_select$roi_name[r]
   

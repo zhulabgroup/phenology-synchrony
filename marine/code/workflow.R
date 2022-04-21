@@ -1,8 +1,10 @@
-library(tidyverse)
-library(corrplot)
-library(ggrepel)
-library(raster)
-library(minpack.lm)
+library(pacman)
+p_load(tidyverse)
+p_load(corrplot)
+p_load(ggrepel)
+p_load(raster)
+p_load9(maps)
+p_load(minpack.lm)
 
 data<-read_csv("./marine/data/bethany_bottomtrawl_fall.csv") %>% 
   dplyr::select(-SEASON, -name, -LAT, -LON) %>% 
@@ -243,5 +245,3 @@ dev.off()
 
 t.test(abundance_df %>% filter(management=="managed") %>% pull(roc),
        abundance_df %>% filter(management=="unmanaged") %>% pull(roc))
-
-# does depth matter

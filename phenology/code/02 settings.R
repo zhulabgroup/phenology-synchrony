@@ -93,11 +93,11 @@ num_part <- 5
 
 num_epoch <- 1 #20
 
-basisnumber <-1000 
+basisnumber <-500 
 
 maxcount<-100
 
 num_sample<-50
 
-temp_sd<-0.01
-pheno_sd <- 0.02
+# temp_sd<-0.01
+# pheno_sd <- 0.02
