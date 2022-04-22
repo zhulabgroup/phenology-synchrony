@@ -1,12 +1,14 @@
+library(pacman)
 #######################
 # 1 - process BBS data
 #######################
 
 
 # load packages -----------------------------------------------------------
-
-library(bbsBayes)
-library(tidyverse)
+# JAGS downloaded from https://sourceforge.net/projects/mcmc-jags/files/
+Sys.setenv(PKG_CONFIG_PATH="/usr/local/lib/pkgconfig")
+p_load(bbsBayes)
+p_load(tidyverse)
 
 
 # settings ----------------------------------------------------------------
@@ -17,7 +19,7 @@ run_date <- '2021-10-12'
 # get data ----------------------------------------------------------------
 
 #only needs to be run once
-#fetch_bbs_data()
+# fetch_bbs_data()
 
 strat_data <- stratify(by = 'bbs_cws')
 
