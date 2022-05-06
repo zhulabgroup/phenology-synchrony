@@ -69,9 +69,13 @@ for (i in 1:length(sp_list)) {
     filter(sum(abundance)>1000) %>% 
     ungroup() 
   
-  # dir.create("./marine/archive/ts/", recursive = T)
-  # cairo_pdf(paste0("./marine/archive/ts/",sp, ".pdf"))
-  p_ts<-ggplot(data_sp)+
+  see_sites<-data_sp %>% 
+    group_by(site, id) %>%
+    summarise(sum=sum(abundance)) %>%
+    arrange(desc(sum)) %>% 
+    head(4) %>% 
+    pull(id)
+  p_ts<-ggplot(data_sp %>% filter(id %in% see_sites))+
     geom_line(aes(x=YEAR, y=logabun, col=site, group=site), alpha=0.5)+
     guides(col="none")+
     theme_classic()+
@@ -79,7 +83,9 @@ for (i in 1:length(sp_list)) {
     ylab("log (abundance + 1)")
   # print(p)
   # dev.off()
-  
+  if (i==8) {
+    p_ts_1sp<-p_ts
+  }
   data_mat<- data_sp %>% 
     dplyr::select(-site, -abundance) %>% 
     spread(key = "id", value="logabun") %>% 
@@ -90,10 +96,7 @@ for (i in 1:length(sp_list)) {
 
     # variogram
   
-  # dir.create("./marine/archive/corr_mat/", recursive = T)
-  # cairo_pdf(paste0("./marine/archive/corr_mat/",sp, ".pdf"))
   p_corrmat<-ggcorrplot(res, method="circle")
-  # dev.off()
   
   mean_corr<-mean(res-diag(nrow=nrow(res), ncol=ncol(res)), na.rm = T)
   
@@ -112,21 +115,24 @@ for (i in 1:length(sp_list)) {
     filter(distance>0) %>% 
     drop_na(correlation)
   
-  # dir.create("./marine/archive/corr_map/", recursive = T)
-  # cairo_pdf(paste0("./marine/archive/corr_map/",sp, ".pdf"))
+  # set.seed(42)
   p_corrmap<-ggplot ()+
     geom_polygon( data=usa_crop, aes(x=long, y=lat, group=group),
                   color="darkblue", fill="lightblue", size = .1 )+
     geom_point(data=data ,aes(x=midlon, y=midlat))+
-    geom_segment(data=corr_df%>% filter(distance<=quantile(corr_df$distance, 0.5)),aes(x=start_lon, y=start_lat, xend=end_lon, yend=end_lat, col=correlation))+
+    geom_segment(data=corr_df %>%
+                   filter(distance<=quantile(corr_df$distance, 0.25))
+                   # sample_n(min(50, nrow(.)))
+                 ,aes(x=start_lon, y=start_lat, xend=end_lon, yend=end_lat, col=correlation))+
     scale_color_viridis_c(begin=0, end=1)+
     theme_minimal()+
     xlab("longitude")+
     ylab("latitude")+
     coord_equal()
   
-  # print(p)
-  # dev.off()
+  if (i==8) {
+    p_corrmap_1sp<-p_corrmap
+  }
   
     
   loess_model<-loess(correlation ~ distance, data=corr_df)
@@ -147,23 +153,26 @@ for (i in 1:length(sp_list)) {
   phi<- exp(coef(model)[3]) 
   range<- -log(0.5)/phi
   
-  # dir.create("./marine/archive/decay/", recursive = T)
-  # cairo_pdf(paste0("./marine/archive/decay/",sp, ".pdf"))
   p_decay<-ggplot(corr_df)+
     geom_point(aes(x=distance, y=correlation))+
-    geom_line(aes(x=distance, y=fit), color="blue")+
+    geom_line(aes(x=distance, y=fit), color="blue", lwd=2)+
     # geom_smooth(aes(x=distance, y=correlation),method=loess,col="red")+
-    geom_line(aes(x=distance, y=smooth), col="red")+
+    # geom_line(aes(x=distance, y=smooth), col="red")+
     geom_hline(yintercept = lower, lty=2)+
     geom_hline(yintercept = upper, lty=2)+
     geom_vline(xintercept = range, lty=2)+
     xlim(0,12)+
     # ylim(0,1)+
     theme_classic()
-  # print(p)
-  # dev.off()
+  if (i==8) {
+    p_decay_1sp<-p_decay
+  }
   
-  decay_df_list[[i]]<-data.frame(mean=mean_corr, upper=upper, lower=lower, range=range, n=nrow(corr_df))
+  decay_df_list[[i]]<-tibble(`mean correlation`=mean_corr, 
+                                 `maximum correlation at short distance`=upper, 
+                                 `minimum correlation at long distance`=lower,
+                                 `distance where correlation decays to half`=range,
+                                 `number of pairs of sites`=nrow(corr_df))
   
   dir.create("./marine/output/by_species/", showWarnings = F)
   pdf(paste0("./marine/output/by_species/",sp,".pdf"), width = 16, height = 16)
@@ -174,6 +183,10 @@ for (i in 1:length(sp_list)) {
 }
 decay_df<-bind_rows(decay_df_list)
 
+p_ts_1sp
+p_corrmap_1sp
+p_decay_1sp
+
 sp_list
 management=c(0, 1, 0, 1, 0,
           1, 1, 1, 1, 1,
@@ -183,7 +196,7 @@ management=c(0, 1, 0, 1, 0,
 # https://media.fisheries.noaa.gov/2021-04/New-England-Managed-Species.pdf
 # https://www.fisheries.noaa.gov/new-england-mid-atlantic/population-assessments/fishery-stock-assessments-new-england-and-mid-atlantic
 
-sync_df<-data.frame(species=sp_list, decay_df,
+sync_df<-tibble(species=sp_list, decay_df,
                     management=management) %>% 
   mutate(management=case_when(management==0~"unmanaged",
                            management==1~"managed")) %>% 
@@ -198,7 +211,7 @@ abundance_df<-data %>%
   group_by(species) %>% 
   do(broom::tidy(lm(abundance ~ YEAR, .))) %>%
   filter(term == "YEAR") %>%
-  dplyr::select(species, roc = estimate, p = p.value) %>% 
+  dplyr::select(species, `rate of change in abundance` = estimate, p = p.value) %>% 
   ungroup() %>% 
   mutate(management=management) %>% 
   mutate(management=case_when(management==0~"unmanaged",
@@ -207,15 +220,28 @@ abundance_df<-data %>%
 
 summary_df<-full_join(sync_df, abundance_df %>% dplyr::select(-p),by=c("species", "management"))
 pdf("./marine/output/summary.pdf")
-p_summary<-ggplot(summary_df %>% gather(key="var", value="value", -species, -management) %>% filter(var!="n"))+
+p_summary<-ggplot(summary_df %>%
+                    gather(key="var", value="value", -species, -management) %>% 
+                  filter(var!="number of pairs of sites") %>%
+                    filter(var %in% c("distance where correlation decays to half", "rate of change in abundance")) %>% 
+                    mutate(var=as.factor(var)))+
   geom_boxplot(aes(x=management, y=value))+
   geom_point(aes(x=management, y=value), cex=2, col="red", pch=1)+
   # geom_label_repel(aes(x=management, y=value, label=species), cex=3, col="red")+
   theme_classic()+
   xlab("")+
-  facet_wrap(.~var, scales = "free_y")+
+  facet_wrap(.~var, scales = "free_y", labeller = labeller(var = label_wrap_gen(15)))+
   ylab("")
 print(p_summary)
+dev.off()
+pdf('./marine/output/ts_map_decay_box.pdf', width = 12, height = 10)
+grid.arrange(annotate_figure(p_ts_1sp, fig.lab = "A"),
+             annotate_figure(p_corrmap_1sp, fig.lab = "B"),
+             annotate_figure(p_decay_1sp, fig.lab = "C"),
+             annotate_figure(p_summary, fig.lab = "D"),
+             layout_matrix=rbind(c(1,2),
+                                 c(3, 4))
+)
 dev.off()
 
 t.test(sync_df %>% filter(management=="managed") %>% pull(range),
