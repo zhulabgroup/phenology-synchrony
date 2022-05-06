@@ -58,69 +58,73 @@ bstrat2 <- left_join(bstrat, RID_df, by = c('statenum', 'Route')) %>%
 uRID <- unique(bstrat2$RID)
 
 #create empty df to fill
-m_data <- bstrat2
-m_data[] <- NA
-m_data$mn_count <- NA
-m_data$residuals <- NA
-counter <- 1
 
 #RESIDUALS MIGHT BE OFF (for route 5146 at least was 0)
 #INCLUDE ALL SPECIES, NOT JUST COMPLETE TIME SERIES (determine what to do about zeros in time series) - can filter after using mean count, etc.
 #MEAN WHEN MULTIPLE OBS PER YEAR
 #at least 5 species for each RID
 
-# write as parallel operations
-for (i in 1:length(uRID))
-{
-  #i <- 770
-  print(paste0('processing route: ', i, ' of ', length(uRID)))
-  #data for single route
-  r_data <- dplyr::filter(bstrat2, RID == uRID[i])
-  
-  #only species seen in all years
-  sp_keep1 <- r_data %>%
-    dplyr::group_by(AOU) %>%
-    dplyr::summarize(nyrs = length(unique(Year))) %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(nyrs == length(unique(r_data$Year)))
-  
-  #filtered by 'abundant' species
-  r_data2 <- r_data %>%
-    dplyr::filter(AOU %in% sp_keep1$AOU)
-  
-  # sp_keep1 <- data.frame(AOU = unique(r_data$AOU))
-  
-  #get mean count of each species across years
-  sp_keep2 <- r_data2 %>%
-    dplyr::group_by(AOU) %>%
-    dplyr::summarize(mn_count = mean(SpeciesTotal)) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(AOU)
-  
-  r_data3 <- dplyr::left_join(r_data2, sp_keep2, by = 'AOU') %>%
-    dplyr::arrange(AOU, Year)
-  # r_data2 <- r_data
-  
-  
-  #get residuals from linear regression (on log count)
-  resids <- r_data3 %>%
-    group_by(AOU) %>%
-    do(model = residuals(lm(log_count ~ Year, data = .)))
-  
-  #add to df
-  r_data3$residuals <- unlist(resids$model)
-  
-  if (NROW(r_data3) >= 5)
-  {
-    #fill master df
-    m_data[(counter:(counter + NROW(r_data3) - 1)),] <- r_data3
-    #advance counter
-    counter <- counter + NROW(r_data3)
-  }
-}
+p_load(foreach)
+p_load(doSNOW)
+num_cores <- 50
+cl <- makeCluster(num_cores)
+registerDoSNOW(cl)
+m_data_list<-
+  foreach (i = 1:length(uRID),
+           .packages = c("tidyverse")) %dopar% {
+             #i <- 770
+             print(paste0('processing route: ', i, ' of ', length(uRID)))
+             #data for single route
+             r_data <- dplyr::filter(bstrat2, RID == uRID[i])
+             
+             #only species seen in all years
+             sp_keep1 <- r_data %>%
+               dplyr::group_by(AOU) %>%
+               dplyr::summarize(nyrs = length(unique(Year))) %>%
+               dplyr::ungroup() %>%
+               dplyr::filter(nyrs == length(unique(r_data$Year)))
+             
+             #filtered by 'abundant' species
+             r_data2 <- r_data %>%
+               dplyr::filter(AOU %in% sp_keep1$AOU)
+             
+             # sp_keep1 <- data.frame(AOU = unique(r_data$AOU))
+             
+             #get mean count of each species across years
+             sp_keep2 <- r_data2 %>%
+               dplyr::group_by(AOU) %>%
+               dplyr::summarize(mn_count = mean(SpeciesTotal)) %>%
+               dplyr::ungroup() %>%
+               dplyr::arrange(AOU)
+             
+             r_data3 <- dplyr::left_join(r_data2, sp_keep2, by = 'AOU') %>%
+               dplyr::arrange(AOU, Year)
+             # r_data2 <- r_data
+             
+             
+             #get residuals from linear regression (on log count)
+             resids <- r_data3 %>%
+               group_by(AOU) %>%
+               do(model = residuals(lm(log_count ~ Year, data = .)))
+             
+             #add to df
+             r_data3$residuals <- unlist(resids$model)
+             
+             if (NROW(r_data3) >= 5)
+             {
+               r_data3
+             }
+           }
+m_data<-bind_rows(m_data_list)
 
-#remove excess zeros at end of df
-m_data2 <- m_data[-c(min(which(is.na(m_data$RID))):NROW(m_data)),]
+# save RDS ----------------------------------------------------------------
+year_list<-m_data %>% pull(Year) %>% unique()
+path_out<-"./avian/data/processed/"
+dir.create(path_out, recursive = T)
+for (year in year_list) {
+  write_rds(m_data %>% filter(Year==year), paste0(path_out, year,'.rds'))
+  print(year)
+}
 
 
 # plot time series for single site ----------------------------------------
@@ -136,7 +140,7 @@ LSZ <- 1.5
 #tick size
 TISZ <- 1.5
 
-tplt <- dplyr::filter(m_data2, RID == uRID[1])
+tplt <- dplyr::filter(m_data, RID == uRID[1])
 #plot log count ~ year
 lc1 <- ggplot(tplt, aes(Year, log_count, color = factor(AOU))) +
   #geom_point(alpha = 0.5) +
@@ -176,10 +180,13 @@ lc2 <- ggplot(tplt, aes(Year, residuals, color = factor(AOU))) +
   ggtitle(paste0(tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
 
 #save figures
-ggsave(plot = lc1, filename = './avian/output/lc_year.pdf', width = 6, height = 4)
-ggsave(plot = lc2, filename = './avian/output/resid_year.pdf', width = 6, height = 4)
+dir.create("./avian/output", recursive = T)
+pdf( './avian/output/lc_year.pdf', width = 6, height = 4)
+print(lc1)
+dev.off()
+
+pdf( './avian/output/resid_year.pdf', width = 6, height = 4)
+print(lc2)
+dev.off()
 
 
-# save RDS ----------------------------------------------------------------
-
-write_rds(m_data2, './avian/data/pro-data.rds')
