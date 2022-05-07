@@ -54,7 +54,8 @@ p_ts<-ggplot()+
   #            aes(xintercept=end, col=Year))+
   theme_classic()+
   facet_wrap(.~Year, ncol=1, scales="free_y")+
-  guides(fill="none")+
+  guides(fill="none",
+         col="none")+
   xlab("day of year")+
   ylab ("cumulated abundance")+
   ggtitle("HARV")
@@ -99,7 +100,8 @@ p_corr<-ggplot(range.df.proc)+
   facet_wrap(.~SciName, scales="free_y")+
   theme_classic()+
   xlab("mean annual temperature (°C)")+
-  ylab ("TDays (day)")
+  ylab ("TDays (day)")+
+  guides(col="none")
 
 p_load(nlme)
 reg_df_list<-vector(mode="list")
