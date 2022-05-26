@@ -143,7 +143,7 @@ p_map <- ggplot() +
                            slice(-n()) %>% 
                            pull(rank), 
                          label=c(0, 0.1, 0.2, 0.3, 0.6))+
-  geom_point(data=tplt %>% distinct(Longitude, Latitude), aes(x=Longitude, y=Latitude), col="red", pch=10, cex=6)+
+  geom_point(data=tplt %>% distinct(Longitude, Latitude), aes(x=Longitude, y=Latitude), col="red", pch=10, cex=6, lwd=2)+
   xlab("longitude")+
   ylab("latitude")+
   theme_minimal() +
