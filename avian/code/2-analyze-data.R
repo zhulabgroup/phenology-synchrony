@@ -15,7 +15,7 @@ p_load(rnaturalearth)
 p_load(gridExtra)
 p_load(ggpubr)
 # load data ----------------------------------------------------------------
-path_in<-"./avian/data/processed/"
+path_in<-paste0(path,"data/processed/")
 files<-list.files(path_in, full.names = T)
 m_data_list<-vector(mode="list", length=length(files))
 for (f in 1:length(files)) {
@@ -24,18 +24,21 @@ for (f in 1:length(files)) {
   print(f)
 }
 data_p<-bind_rows(m_data_list)
-load("./avian/data/bbs_raw_data.RData")
+load(paste0(path, "data/bbs_raw_data.RData"))
 strat_data <- stratify(by = 'bbs_cws', bbs_data = bbs_data)
 
 # time series plot
-tplt <- dplyr::filter(data_p, RID == uRID[1])
+tplt <- dplyr::left_join(data_p, spstrat, by = c('AOU' = 'sp.bbs')) %>%
+  dplyr::filter(order == 'Passeriformes') %>% 
+  dplyr::filter(RID == uRID[1])
 p_ts <- ggplot(tplt, aes(Year, residuals, color = factor(AOU))) +
   geom_line(alpha = 0.5) +
   theme_classic() +
   theme(legend.pos = 'none') +
   xlab('year') +
-  ylab('log(Count) residuals') +
-  ggtitle(paste0(tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
+  ylab('log (count) residuals') +
+  ggtitle(paste0("Site: ",tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
+p_ts
 # stats data --------------------------------------------------------------
 
 #filter for only passerines
@@ -89,8 +92,8 @@ foreach (i = 1:length(uRID),
 out<-bind_rows(out_list)
 
 #save RDS
-write_rds(out, './avian/data/pro-cc.rds')
-# out<-read_rds('./avian/data/pro-cc.rds')
+write_rds(out, paste0(path, 'data/pro-cc.rds'))
+out<-read_rds(paste0(path, 'data/pro-cc.rds'))
 
 
 # plot cc on map ----------------------------------------------------------
@@ -123,7 +126,7 @@ p_map <- ggplot() +
           fill = 'white') +
   #geom_point(data = out, inherit.aes = FALSE, aes(lon, lat, col = mn_cc_lc), size = 1.5, alpha = 0.3) +
   geom_point(data = out2 %>% mutate(rank=rank(mn_cc_rs)), inherit.aes = FALSE, aes(lon, lat, col = rank), size = 1.5, alpha = 0.3) +
-  labs(color = 'Synchrony (rho)') +
+  labs(color = 'mean pairwise correlation coefficient') +
   # scale_color_gradient2(low = '#C7522B', mid = '#FBF2C4', high = '#3C5941',
   #                      #earth
   #                      # scale_fill_gradient2(low = '#A36B2B', mid = '#EDEAC2', high = '#2686A0',
@@ -140,18 +143,17 @@ p_map <- ggplot() +
                            slice(-n()) %>% 
                            pull(rank), 
                          label=c(0, 0.1, 0.2, 0.3, 0.6))+
-  geom_point(data=tplt %>% distinct(Longitude, Latitude), aes(x=Longitude, y=Latitude), col="red", pch=10, cex=3)+
+  geom_point(data=tplt %>% distinct(Longitude, Latitude), aes(x=Longitude, y=Latitude), col="red", pch=10, cex=6)+
   xlab("longitude")+
   ylab("latitude")+
   theme_minimal() +
   theme(legend.position="bottom")+
+  theme(legend.key.height= unit(0.5, 'cm'),
+        legend.key.width= unit(1.5, 'cm'))+
   xlim(c(-170, -50)) +
   ylim(c(20, 75))
+p_map
 
-
-pdf('./avian/output/sync_map.pdf', width = 12, height = 10)
-print(p_map)
-dev.off()
 
 #histogram of community synchrony
 hist(out2$mn_cc_rs, breaks = 20)
@@ -182,7 +184,7 @@ plt6 <- ggplot(out5, aes(x = HFI, y = mn_cc_rs, color = factor(BCR))) +
   geom_point(alpha = 0.3) +
   theme_bw() +
   xlab('Human Footprint Index') +
-  ylab('Synchrony (rho)') +
+  ylab('mean pairwise correlation coefficient') +
   geom_line(stat = 'smooth', method = 'lm', size = 3, alpha = 0.5)
 
 pdf('./avian/output/sync_hfi.pdf',width = 6, height = 4)
@@ -197,7 +199,17 @@ ff <- rstanarm::stan_gamm4(mn_cc_rs ~ s(nsp) + HFI,
                          cores = 4,
                          control = list(adapt_delta = 0.99))
 MCMCvis::MCMCsummary(ff, round = 5)
+write_rds(ff, paste0(path, "data/mcmc.rds"))
 
+ff<-read_rds( paste0(path, "data/mcmc.rds"))
+# check accuracy
+out5<-out5 %>% mutate(pred=predict(ff) )
+ggplot(out5)+
+  geom_point(aes(x=mn_cc_rs, y=pred), alpha=0.3)+
+  theme_classic()
+
+# calculate R^2
+cor(out5$mn_cc_rs, out5$pred)^2
 
 #Contour plot
 pred_y <- predict(ff, newdata = data.frame(nsp = mean(out5$nsp), HFI = 0:50))
@@ -207,20 +219,37 @@ axis_y <- seq(min(out5$HFI), max(out5$HFI), length.out = 50)
 pro_lm_surface <- expand.grid(nsp = axis_x, HFI = axis_y, KEEP.OUT.ATTRS = F)
 pro_lm_surface$sc_p <- predict(ff, newdata = pro_lm_surface)
 
-p_contour<- ggplot(pro_lm_surface)+
-  geom_contour_filled(aes(x=HFI, y=nsp, z=sc_p))+
-  geom_contour(aes(x=HFI, y=nsp, z=sc_p))+
-  metR::geom_label_contour(aes(x=HFI, y=nsp, z=sc_p), skip = 0)+
+p_contour<- ggplot()+
+  geom_point(data=out5%>% mutate(rank=rank(mn_cc_rs)), aes(x=HFI, y=nsp, col=rank), alpha=0.3)+
+  # geom_contour_filled(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p))+
+  geom_contour(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p))+
+  metR::geom_label_contour(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p), skip = 0)+
   ylab ('Number of species')+
   xlab("Human Footprint Index (HFI)")+
-  guides(fill="none")+
+  scale_color_viridis_c( breaks = out5 %>% 
+                           mutate(rank=rank(mn_cc_rs)) %>%
+                           arrange(mn_cc_rs) %>% 
+                           mutate(cut=cut(mn_cc_rs, 
+                                          breaks=c(min(mn_cc_rs),c(0, 0.1, 0.2, 0.3, 0.6), max(mn_cc_rs)),
+                                          include.lowest=T)) %>% 
+                           group_by(cut) %>% 
+                           summarise(rank=max(rank)+0.5) %>%
+                           slice(-n()) %>% 
+                           pull(rank), 
+                         label=c(0, 0.1, 0.2, 0.3, 0.6))+
+  guides(col="none")+
+  # labs(color = 'Synchrony (rho)') +
+  # theme(legend.position="bottom")+
+  # theme(legend.key.height= unit(0.5, 'cm'),
+  #       legend.key.width= unit(1, 'cm'))+
   theme_classic()
+p_contour
 
 pdf('./avian/output/sync_nsp_hfi_contour.pdf', width = 4, height = 4)
 print(p_contour)
 dev.off()
 
-pdf('./avian/output/ts_map_cont.pdf', width = 12, height = 8)
+pdf(paste0(path, 'output/ts_map_cont.pdf'), width = 12, height = 8)
 grid.arrange(annotate_figure(p_ts, fig.lab = "A"),
              annotate_figure(p_map, fig.lab = "B"),
              annotate_figure(p_contour, fig.lab = "C"),

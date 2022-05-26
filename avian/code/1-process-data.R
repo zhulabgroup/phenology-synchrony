@@ -14,7 +14,8 @@ p_load(tidyverse)
 
 #only needs to be run once
 # fetch_bbs_data()
-load("./avian/data/bbs_raw_data.RData")
+path<-"./avian/"
+load(paste0(path,"data/bbs_raw_data.RData"))
 
 strat_data <- stratify(by = 'bbs_cws', bbs_data = bbs_data)
 
@@ -119,7 +120,7 @@ m_data<-bind_rows(m_data_list)
 
 # save RDS ----------------------------------------------------------------
 year_list<-m_data %>% pull(Year) %>% unique()
-path_out<-"./avian/data/processed/"
+path_out<-paste0(path, "data/processed/")
 dir.create(path_out, recursive = T)
 for (year in year_list) {
   write_rds(m_data %>% filter(Year==year), paste0(path_out, year,'.rds'))
