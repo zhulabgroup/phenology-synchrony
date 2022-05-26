@@ -11,7 +11,8 @@ p_load(rgeos)
 p_load(gridExtra)
 p_load(geosphere)
 
-data<-read_csv("./marine/data/bethany_bottomtrawl_fall.csv") %>% 
+path<-"./marine/"
+data<-read_csv(paste0(path,"data/bethany_bottomtrawl_fall.csv")) %>% 
   dplyr::select(-SEASON, -name, -LAT, -LON) %>% 
   gather(key="species", value="CPUE", -YEAR, -STRATUM, -NTOWS, -midlat, -midlon, -group) %>% 
   mutate(abundance=abs(CPUE)) %>% 
@@ -53,7 +54,7 @@ p_map<-ggplot()+
   ylab("latitude")+
   guides(col=guide_legend(title=""))+
   coord_equal()
-  
+p_map
 pdf("./marine/output/map.pdf", width = 8, height = 8)
 print(p_map)
 dev.off()
@@ -85,22 +86,22 @@ for (i in 1:length(sp_list)) {
     mutate(predict=YEAR*beta+intercept) %>% 
     mutate(detrend=logabun-predict)
   
-  data_sp %>% 
-    ggplot(aes(x=YEAR, y=detrend, col=id %>% as.factor())) +
-    geom_line() 
+  # data_sp %>% 
+  #   ggplot(aes(x=YEAR, y=detrend, col=id %>% as.factor())) +
+  #   geom_line() 
   
   see_sites<-data_sp %>% 
     group_by(site, id) %>%
     summarise(sum=sum(abundance)) %>%
     arrange(desc(sum)) %>% 
-    head(4) %>% 
+    head(6) %>% 
     pull(id)
   p_ts<-ggplot(data_sp %>% filter(id %in% see_sites))+
-    geom_line(aes(x=YEAR, y=detrend, col=site, group=site), alpha=0.5)+
+    geom_line(aes(x=YEAR, y=logabun, col=site, group=site), alpha=0.5)+
     guides(col="none")+
     theme_classic()+
     xlab("year")+
-    ylab("log (abundance + 1)")
+    ylab("log (CPUE + 1)")
     if (i==8) {
     p_ts_1sp<-p_ts
     }
@@ -144,7 +145,7 @@ for (i in 1:length(sp_list)) {
                   color="darkblue", fill="lightblue", size = .1 )+
     geom_point(data=data ,aes(x=midlon, y=midlat))+
     geom_segment(data=corr_df %>%
-                   filter(distance<=quantile(corr_df$distance, 0.25))
+                   filter(distance<=quantile(corr_df$distance, 0.5))
                  ,aes(x=start_lon, y=start_lat, xend=end_lon, yend=end_lat, alpha=abs(correlation), col=correlation))+
     scale_color_viridis_c()+
     guides(alpha="none")+
@@ -175,19 +176,21 @@ for (i in 1:length(sp_list)) {
   phi<- exp(coef(model)[3]) 
   range<- -log(0.5)/phi
   
-  p_decay<-ggplot(corr_df)+
-    geom_point(aes(x=distance*100, y=correlation), alpha=0.25)+
+  p_decay<-ggplot(corr_df %>% mutate(bin=distance%/%0.5*0.5*100 ) )+
+    geom_boxplot(aes(x=bin, y=correlation, group=bin), alpha=0.25)+
+    # geom_point(aes(x=distance*100, y=correlation), alpha=0.25)+
     geom_line(aes(x=distance*100, y=fit), color="blue", lwd=2)+
     # geom_smooth(aes(x=distance, y=correlation),method=loess,col="red")+
     # geom_line(aes(x=distance, y=smooth), col="red")+
     geom_hline(yintercept = lower, lty=2, col="red")+
     geom_hline(yintercept = upper, lty=2, col="red")+
     geom_vline(xintercept = range*100, lty=2, col="red")+
-    xlim(0,12*100)+
+    xlim(-50,12*100+50)+
     # ylim(0,1)+
-    ylab ("Pearson correlation")+
+    ylab ("pairwise correlation coefficient")+
     xlab ("distance (km)")+
     theme_classic()
+  # p_decay
   if (i==8) {
     p_decay_1sp<-p_decay
   }
@@ -198,8 +201,8 @@ for (i in 1:length(sp_list)) {
                                  range=range,
                                  n=nrow(corr_df))
   
-  dir.create("./marine/output/by_species/", showWarnings = F)
-  pdf(paste0("./marine/output/by_species/",sp,".pdf"), width = 16, height = 16)
+  dir.create(paste0(path, "output/by_species/"), showWarnings = F)
+  pdf(paste0(path,"output/by_species/",sp,".pdf"), width = 16, height = 16)
   grid.arrange(p_ts, p_corrmat, p_corrmap, p_decay, nrow=2, top=sp)
   dev.off()
   
@@ -243,13 +246,13 @@ abundance_df<-data %>%
   arrange(species)
 
 summary_df<-full_join(sync_df, abundance_df %>% dplyr::select(-p),by=c("species", "management"))
-pdf("./marine/output/summary.pdf")
+pdf(paste0(path, "output/summary.pdf"))
 p_summary<-ggplot(summary_df %>%
                     mutate(range=range*100) %>% 
                     dplyr::select(species, management, 
-                                  `mean correlation`=mean,
+                                  # `mean correlation`=mean,
                                   `distance where correlation decays to half (km)`=range,
-                                  `rate of change in abundance (per year)`=roc) %>% 
+                                  `rate of change in CPUE (per year)`=roc) %>% 
                     gather(key="var", value="value", -species, -management)  %>% 
                     mutate(var=as.factor(var)))+
   geom_boxplot(aes(x=management, y=value))+
@@ -262,7 +265,7 @@ p_summary<-ggplot(summary_df %>%
 print(p_summary)
 dev.off()
 
-pdf('./marine/output/ts_map_decay_box.pdf', width = 12, height = 10)
+pdf(paste0(path, 'output/ts_map_decay_box.pdf'), width = 12, height = 10)
 grid.arrange(annotate_figure(p_ts_1sp, fig.lab = "A"),
              annotate_figure(p_corrmap_1sp, fig.lab = "B"),
              annotate_figure(p_decay_1sp, fig.lab = "C"),
