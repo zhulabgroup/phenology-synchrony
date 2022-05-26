@@ -1,6 +1,7 @@
 library(pacman)
 p_load(tidyverse)
-
+p_load(gridExtra)
+p_load(ggpubr)
 path <- "./mosquito/"
 pred.df <- readRDS(paste0(path, "data/predict.rds")) %>% 
   filter(Site !="HARV")
@@ -9,6 +10,10 @@ pred3.df <- readRDS(paste0(path, "data/predict_long.rds")) %>%
   filter(Site != "HARV")
 
 full.df <- bind_rows(pred.df, pred1.df,pred3.df)
+
+site_df<-read_csv(paste0(path, "/data/NEON_Field_Site_Metadata_20220412.csv")) %>% 
+  dplyr::select(Site=field_site_id, lat=field_latitude, lon=field_longitude) %>% 
+  filter(Site %in% unique(full.df$Site))
 
 usa <- map("state", fill = TRUE)
 IDs <- sapply(strsplit(usa$names, ":"), function(x) x[1])
@@ -43,6 +48,18 @@ count.df %>%
   facet_wrap(.~Site)+
   theme(legend.position = "none")
 
+
+  
+## generating the number of days between the 10% quantile and 90th quanitile
+## Higher values indicate
+
+range.df <- count.df %>%
+  filter(proCount >= .1 & proCount <= .9) %>% 
+  group_by( SciName, Year, Site) %>%
+  summarise(start=min(DOY),
+            end=max(DOY),
+            TDays = n())
+
 p_ts<-ggplot()+
   geom_line(data=count.df %>% filter(Site=="HARV", SciName=="Aedes trivittatus"),
             aes(x=DOY,y=cumCount, col=Year))+
@@ -58,20 +75,8 @@ p_ts<-ggplot()+
          col="none")+
   xlab("day of year")+
   ylab ("cumulated abundance")+
-  ggtitle("HARV")
-  
-## generating the number of days between the 10% quantile nad 90th quanitile
-## Higher values indicate
-
-range.df <- count.df %>%
-  filter(proCount >= .1 & proCount <= .9) %>% 
-  group_by( SciName, Year, Site) %>%
-  summarise(start=min(DOY),
-            end=max(DOY),
-            TDays = n())
-
-# ggplot(range.df , aes(x=SciName, y= TDays, col=Year)) + geom_point() + 
-#   facet_wrap(.~Site)
+  ggtitle(expression(paste("Site: HARV  Species: ",italic("Aedes trivittatus"))))
+p_ts
 
 ggplot(range.df %>%
          # filter(Site != "ORNL" & Site != "SERC" & Site != "TALL" & Site != "WREF" & Site != "YELL") %>% 
@@ -86,6 +91,37 @@ ggplot(range.df %>%
   theme_classic()+
   guides(col="none")
 
+### get daymet data
+
+if(!file.exists( paste0(path, "data/daymet.rds"))) {
+  library(daymetr)
+  daymet_df_list<-vector(mode="list", length=nrow(site_df))
+  for (r in 1:nrow(site_df)) {
+    daymet_df_list[[r]] <- download_daymet(site = site_df$Site[r],
+                                           lat = site_df$lat[r],
+                                           lon = site_df$lon[r],
+                                           start = 2014,
+                                           end = 2019,
+                                           internal = TRUE,
+                                           simplify = TRUE) %>% 
+      mutate(date=as.Date(yday, origin = as.Date(paste0(year,"-01-01")))) %>% 
+      spread(key="measurement", value="value") %>% 
+      dplyr::select(date, tmax=`tmax..deg.c.`, tmin=`tmin..deg.c.`, prcp=`prcp..mm.day.`) %>% 
+      mutate(temp=(tmax+ tmin)/2) %>% 
+      dplyr::select(date, temp, prcp) %>% 
+      mutate(Site=site_df$Site[r])
+  }
+  daymet_df<-bind_rows(daymet_df_list) %>% 
+    mutate(Year=format(date, "%Y") %>% as.numeric()) %>% 
+    group_by(Year, Site) %>% 
+    summarise(mat=mean(temp),
+              tap=sum(prcp))
+  write_rds(daymet_df,paste0(path, "data/daymet.rds"))
+}  else {
+  daymet_df<-read_rds(paste0(path, "data/daymet.rds"))
+}
+
+###
 range.df.proc<-range.df %>%
   left_join( range.df %>% group_by(SciName) %>% distinct(Year, Site) %>% summarise(n=n()),
              by=c( "SciName")) %>% 
@@ -93,27 +129,31 @@ range.df.proc<-range.df %>%
   mutate(Year=as.numeric(Year)) %>% 
   left_join(daymet_df, by=c("Site", "Year"))
 
-p_corr<-ggplot(range.df.proc)+
-  geom_point(aes(x=mat, y = TDays, col=Site))+
-  # geom_smooth(aes(x=mat, y = TDays, col=Site),method="lm", se=F)+
-  geom_smooth(aes(x=mat, y = TDays),method="lm", se=T)+
-  facet_wrap(.~SciName, scales="free_y")+
-  theme_classic()+
-  xlab("mean annual temperature (°C)")+
-  ylab ("TDays (day)")+
-  guides(col="none")
-
 p_load(nlme)
 reg_df_list<-vector(mode="list")
 for (sp in range.df.proc %>% pull(SciName) %>% unique()) {
   lme.fit <- lme(TDays~mat,random=~1|Site,data=range.df.proc %>% filter(SciName==sp))
   res<-summary(lme.fit)
-  reg_df_list[[sp]]<-data_frame(SciName=sp,
-             estimate=res$tTable[2, 1],
-             se=res$tTable[2, 2],
-             p=res$tTable[2, 5])
+  reg_df_list[[sp]]<-tibble(SciName=sp,
+                            estimate=res$tTable[2, 1],
+                            se=res$tTable[2, 2],
+                            p=res$tTable[2, 5])
 }
 reg_df<-bind_rows(reg_df_list)
+
+p_corr<-ggplot()+
+  geom_point(data=range.df.proc, aes(x=mat, y = TDays, col=Site))+
+  geom_smooth(data=range.df.proc %>% left_join(reg_df, by="SciName") %>% filter(p<0.05), 
+              aes(x=mat, y = TDays),method="lm", se=T, col="blue")+
+  geom_smooth(data=range.df.proc %>% left_join(reg_df, by="SciName") %>% filter(p>=0.05), 
+              aes(x=mat, y = TDays),method="lm", se=T, col="black")+
+  facet_wrap(.~SciName, scales="free_y")+
+  theme_classic()+
+  xlab("mean annual temperature (°C)")+
+  ylab ("mosquito season length (day)")+
+  guides(col="none")+
+  theme(strip.text = element_text(face = "italic"))
+p_corr
 
 p_summary<-ggplot()+
   geom_point(data=reg_df, aes(x=SciName, y=estimate))+
@@ -125,11 +165,13 @@ p_summary<-ggplot()+
   xlab("species")+
   ylab ("regression coefficient (day / °C)")+
   coord_flip()+
-  scale_x_discrete(limits=rev)
+  scale_x_discrete(limits=rev)+
+  theme(axis.text.y = element_text(face = "italic"))
+p_summary
 summary(reg_df$estimate>0)
 summary(reg_df$p<0.05)
 
-pdf('./mosquito/output/map_ts_corr_sum.pdf', width = 12, height = 8)
+pdf(paste0(path, 'output/map_ts_corr_sum.pdf'), width = 12, height = 8)
 grid.arrange(annotate_figure(p_map, fig.lab = "A"),
              annotate_figure(p_ts, fig.lab = "B"),
              annotate_figure(p_corr, fig.lab = "C"),

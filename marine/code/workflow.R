@@ -14,7 +14,7 @@ p_load(geosphere)
 data<-read_csv("./marine/data/bethany_bottomtrawl_fall.csv") %>% 
   dplyr::select(-SEASON, -name, -LAT, -LON) %>% 
   gather(key="species", value="CPUE", -YEAR, -STRATUM, -NTOWS, -midlat, -midlon, -group) %>% 
-  mutate(abundance=CPUE*NTOWS) %>% 
+  mutate(abundance=abs(CPUE)) %>% 
   mutate(logabun=log(abundance+1)) %>% 
   mutate(site=paste0(midlon,"_", midlat))
   # group_by (YEAR, group, species) %>% 
@@ -67,8 +67,27 @@ for (i in 1:length(sp_list)) {
     arrange(midlat, midlon) %>% 
     dplyr::select(-STRATUM, -NTOWS, -group,-midlat, -midlon, -species, -CPUE) %>% 
     group_by(site,id) %>% 
-    filter(sum(abundance)>1000) %>% 
+    filter(sum(abundance==0)/n()<0.50) %>% 
     ungroup() 
+  
+  data_tsbl<-data_sp %>% 
+    dplyr::select(-site) %>% 
+    as_tsibble(index = YEAR, key=id)
+  lm_df <- data_tsbl %>%
+    model(TSLM(logabun ~ YEAR)) %>%
+    tidy(fit) %>% 
+    dplyr::select(id, term, estimate) %>% 
+    spread(key="term", value="estimate") %>% 
+    rename(intercept=`(Intercept)`, beta=YEAR)
+  
+  data_sp<-data_sp %>% 
+    left_join(lm_df , by=c("id")) %>% 
+    mutate(predict=YEAR*beta+intercept) %>% 
+    mutate(detrend=logabun-predict)
+  
+  data_sp %>% 
+    ggplot(aes(x=YEAR, y=detrend, col=id %>% as.factor())) +
+    geom_line() 
   
   see_sites<-data_sp %>% 
     group_by(site, id) %>%
@@ -77,7 +96,7 @@ for (i in 1:length(sp_list)) {
     head(4) %>% 
     pull(id)
   p_ts<-ggplot(data_sp %>% filter(id %in% see_sites))+
-    geom_line(aes(x=YEAR, y=logabun, col=site, group=site), alpha=0.5)+
+    geom_line(aes(x=YEAR, y=detrend, col=site, group=site), alpha=0.5)+
     guides(col="none")+
     theme_classic()+
     xlab("year")+
@@ -87,8 +106,8 @@ for (i in 1:length(sp_list)) {
     }
   
   data_mat<- data_sp %>% 
-    dplyr::select(-site, -abundance) %>% 
-    spread(key = "id", value="logabun") %>% 
+    dplyr::select(YEAR, id, detrend) %>% 
+    spread(key = "id", value="detrend") %>% 
     dplyr::select(-YEAR)
   
   res<-cor(data_mat,use="complete.obs")
@@ -145,8 +164,8 @@ for (i in 1:length(sp_list)) {
   
   model <- nlsLM(correlation ~ SSasymp(distance, yf, y0, log_alpha), data = corr_df ,
                  start=c(y0=0.5, yf=0, log_alpha=log(-log(0.5)/5)),
-                 lower = c(0, 0, log(-log(0.5)/12)),
-                 upper=c(1,1, log(-log(0.5)/1)),
+                 lower = c(0, 0, log(-log(0.5)/10)),
+                 upper=c(1,1, log(-log(0.5)/0.1)),
                  trace = F)
   corr_df <- corr_df %>% 
     mutate(fit = predict(model))  
@@ -228,6 +247,7 @@ pdf("./marine/output/summary.pdf")
 p_summary<-ggplot(summary_df %>%
                     mutate(range=range*100) %>% 
                     dplyr::select(species, management, 
+                                  `mean correlation`=mean,
                                   `distance where correlation decays to half (km)`=range,
                                   `rate of change in abundance (per year)`=roc) %>% 
                     gather(key="var", value="value", -species, -management)  %>% 
@@ -260,10 +280,13 @@ summary_df %>%
             sd=sd(value))
 
 t.test(sync_df %>% filter(management=="managed") %>% pull(range),
-       sync_df %>% filter(management=="unmanaged") %>% pull(range))
+       sync_df %>% filter(management=="unmanaged") %>% pull(range),
+       alternative = "less")
 
 t.test(sync_df %>% filter(management=="managed") %>% pull(mean),
-       sync_df %>% filter(management=="unmanaged") %>% pull(mean))
+       sync_df %>% filter(management=="unmanaged") %>% pull(mean),
+       alternative = "greater")
 
 t.test(abundance_df %>% filter(management=="managed") %>% pull(roc),
-       abundance_df %>% filter(management=="unmanaged") %>% pull(roc))
+       abundance_df %>% filter(management=="unmanaged") %>% pull(roc),
+       alternative = "greater")
