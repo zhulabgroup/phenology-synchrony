@@ -1,0 +1,376 @@
+---
+title: "Phenology Case Study"
+author: "Mallory Barnes and Dawn Browning"
+date: "3/9/2022"
+output:
+  word_document:
+    reference_docx: StylesTemplate.docx
+csl: american-geophysical-union.csl
+bibliography: References.bib
+---
+
+```{r setup, include=FALSE}
+#1remotes::install_github("paleolimbot/rbbt")
+knitr::opts_chunk$set(echo = TRUE)
+#devtools::install_github("bfast2/strucchangeRcpp")
+#devtools::install_github("bfast2/bfast")
+#install.packages("greenbrown", repos="http://R-Forge.R-project.org")
+#Notes on Pheno Metrics: 
+#sos start of season
+#eos end of season
+#los length of season
+#pop position of peak value (maximum)
+#pot position of trough value (minimum)
+#mgs mean growing season value
+#peak peak value (maximum)
+#trough trough value (minimum)
+#msp mean spring value
+#mau mean autumn value
+#rsp rate of spring greenup (not all methods)
+#rau rate of autumn senescence rates (not all methods)
+source("00_Synchrony_Setup.R")
+```
+
+## Introduction
+
+Synchrony can be defined as the degree of attunement between patterns that occur in the realms of space and time. Temporal synchrony is a quality of correlation between the timing of patterns in biological phenomena and the dimension of synchrony we explore in this example.
+
+The study of phenology characterizes temporal patterns in biological activity and the association with meteorological/environmental drivers is a burgeoning field (review, citations). Patterns between primary production and environmental cues are well-studied (cite or not given review papers cited in previous sentence), but less so in highly managed agricultural systems such as croplands (cite). Understanding the nature and degree of temporal synchrony between environmental drivers and primary production or yield in agricultural systems is of paramount importance to food security and agricultural sustainability (Browning et al. 2021, other cites). Eddy-covariance data provide high frequency estimates of water and carbon fluxes and are considered a “gold standard” for estimating vegetation productivity [@baldocchiHowEddyCovariance2020; @novickInformingNatureBased2022] and are readily available through centralized repositories including the Ameriflux network and FLUXNET datasets [@pastorelloFLUXNET2015DatasetONEFlux2020]. Three (or more if we consider CZO) research networks, LTAR, LTER, and NEON include sites that contribute to the Ameriflux network. Add mention of remotely sensed imagery for consistent data available worldwide.
+
+## Methods
+
+We explored the degree and nature of synchrony between climate drivers (precipitation and temperature) and the timing of phenological metrics in managed agroecosystems using remotely sensed, eddy-covariance, and gridded meteorological data from two cropland sites with contrasting water management regimes. The selected sites (US-Ne2 IR and US-Ne3 RF) are within 1.6 km of one another at the LTAR Platte River - High Plains Aquifer network location near Mead, Nebraska, USA (coords?). Mean annual precipitation is 779 mm and temperature is 10.2 deg C [@fickWorldClimNewKm2017], where mean growing season start and end dates are days 150 and 240, respectively [@browningMonitoringAgroecosystemProductivity2021]. 
+
+Both sites are planted with maize-soybean rotations while one site (US-Ne3) is rainfed and the other (US-Ne2) is irrigated with a center-pivot system. Irrigation management at US-Ne2 is accomplished via field-based measurements of evapotranspiration that are used with soil moisture and crop water used in a hybrid-maize model (awaiting citation). We hypothesized that the rainfed US-Ne3 (hereafter, US-Ne3 RF) site would demonstrate greater synchrony with climate drivers (precipitation and temperature) than the irrigated site (US-Ne2 IR). 
+
+Gross primary productivity (GPP) and tower-measured precipitation and temperature data were obtained for US-Ne2 IR [@suykerFLUXNET2015USNe2Mead2016] and US-Ne3 RF [@suykerFLUXNET2015USNe3Mead2016] from 2001-2013 via the FLUXNET2015 Dataset [@pastorelloFLUXNET2015DatasetONEFlux2020]. Data from both sites are freely availabile under the CC-By-4.0 license. Daily maximum and minimum temperature and precipitation data were obtained from the Daymet reanalysis product [@thonrntonDaymetDailySurface2017]. Remotely sensed enhanced vegetation index (EVI) timeseries at 500 m (MOD13A1v006) [@didankamelMOD13A1MODISTerra2015] were obtained from NASA's Moderate Resolution Imaging Spectroradiometer (MODIS) via the Application for Exploring Analysis Ready Samples [@appeearsteamApplicationExtractingExploring2022].
+
+Thirty-minute flux tower GPP and tower data were aggregated to coarser timescales for analysis. We evaluated data at weekly, monthly, and annual time steps for both the full year and growing season only (May through September, inclusive) for years 2001-2013. All analyses were conducted using R [@rcoreteamLanguageEnvironmentStatistical2021].
+
+Winter gaps in EVI timeseries for both sites filled used using the "fillpermanentgaps" function from the 'greenbrown' R package [@forkelGreenbrownLandSurface2015; method further described in @beckImprovedMonitoringVegetation2006], with a minimum gap fraction of 0.2 and a winter fill value of 0.15. The 'phenology' function in the 'greenbrown' package was then used to calculate annual vegetation phenology metrics [@forkelCodominantWaterControl2015] using a spline for temporal smoothing and with and the "White" approach to scaling values [@whiteContinentalPhenologyModel1997]. Phenology metrics calculated from EVI timeseries are described in Table 1.  
+
+```{r Data_Processing, echo=FALSE, include=FALSE, eval=TRUE, cache=TRUE, fig.show='hide'}
+#Not using the flux data anymore, but still needed for code to run properly, could clean up. 
+US_NE2 <- read.csv("data/FLX_US-Ne2_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne2_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
+US_NE3 <- read.csv("data/FLX_US-Ne3_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne3_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
+
+#For Each Site: 
+#Aggregate (daily, weekly, monthly, yearly)
+#Assess Synchrony (daily, weekly, monthly, yearly)
+
+#0) Aggregate to daily timeseries of GPP & Climate Drivers
+#1) Aggregate to weekly timeseries of GPP & Climate Drivers
+#2) Aggregate to monthly timeseries of GPP & Climate Drivers
+#3) Aggregate to yearly timeseries of GPP & Climate Drivers
+
+#Daymet_Data 
+NE2_Daymet <- read.csv("data/NE_211742_lat_41.1649_lon_-96.4701_2022-02-02_122643.csv", skip=7)
+NE3_Daymet <- read.csv("data/NE_311742_lat_41.1797_lon_-96.4397_2022-02-02_122805.csv", skip=7)
+
+NE2_Daymet <- NE2_Daymet %>%
+  mutate(date= as.Date(paste(year, yday, sep="-"), format="%Y-%j"))%>%
+  rename(Daymet_Precip=prcp..mm.day.,Daymet_Tmax=tmax..deg.c., Daymet_Tmin=tmin..deg.c.,) %>%
+  dplyr::select(date, Daymet_Precip, Daymet_Tmax, Daymet_Tmin) %>%
+  filter(date > "2000-12-31")
+
+NE3_Daymet <- NE3_Daymet %>%
+  mutate(date= as.Date(paste(year, yday, sep="-"), format="%Y-%j"))%>%
+  rename(Daymet_Precip=prcp..mm.day.,Daymet_Tmax=tmax..deg.c., Daymet_Tmin=tmin..deg.c.,) %>%
+  dplyr::select(date, Daymet_Precip, Daymet_Tmax, Daymet_Tmin)%>%
+    filter(date > "2000-12-31")
+
+#NE2 First----------------
+US_NE2_Date <- US_NE2 %>%
+  mutate(TIMESTAMP = ymd(TIMESTAMP), 
+         start_day = day(TIMESTAMP),
+         start_month = month(TIMESTAMP), 
+         start_year = year(TIMESTAMP),
+         start_hour = hour(TIMESTAMP))
+
+#Clean up data a bit; turn -9999 into NAs
+US_NE2_Date[US_NE2_Date == -9999] <- NA
+#US_NE2_Date[US_NE2_Date$GPP_DT_CUT_50 < 0] <-NA
+#Filter out 2013
+US_NE2_Date <- subset(US_NE2_Date, start_year > 2000)
+
+#Merge_By_Date
+US_NE2_Date$date <- as.Date(US_NE2_Date$TIMESTAMP)
+US_NE2_Date <- merge(US_NE2_Date, NE2_Daymet, by="date",all.y=TRUE)
+
+US_NE2_yearly <- US_NE2_Date %>%
+  group_by(year=floor_date(date, unit="year")) %>%
+    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+
+US_NE2_yearly_gs <- US_NE2_Date %>%
+  group_by(month=floor_date(date, unit="month")) %>%
+  mutate(month2=as.integer(month(month))) %>%
+  filter(month2 > 4  & month2 < 10)%>%
+  group_by(year=year(as.Date(month))) %>%
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+US_NE2_monthly <- US_NE2_Date %>%
+  group_by(month=floor_date(date, unit="month")) %>%
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+US_NE2_weekly <- US_NE2_Date %>%
+  group_by(week=floor_date(date, unit="week")) %>% 
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+US_NE2_daily <- US_NE2_Date %>%
+  group_by(day=floor_date(date, unit="day")) %>% 
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+#NE3 Next-------
+US_NE3_Date <- US_NE3 %>%
+  mutate(TIMESTAMP = ymd(TIMESTAMP), 
+         start_day = day(TIMESTAMP),
+         start_month = month(TIMESTAMP), 
+         start_year = year(TIMESTAMP),
+         start_hour = hour(TIMESTAMP))
+
+#Clean up data a bit; turn -9999 into NAs
+US_NE3_Date[US_NE3_Date == -9999] <- NA
+#US_NE3_Date[US_NE3_Date$GPP_DT_CUT_50 < 0] <-NA
+#Filter out 2013
+US_NE3_Date <- subset(US_NE3_Date, start_year > 2000)
+
+#Merge_By_Date
+US_NE3_Date$date <- as.Date(US_NE3_Date$TIMESTAMP)
+US_NE3_Date <- merge(US_NE3_Date, NE3_Daymet, by="date",all.y=TRUE)
+
+US_NE3_yearly <- US_NE3_Date %>%
+  group_by(year=floor_date(date, unit="year")) %>%
+    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+
+US_NE3_yearly_gs <- US_NE3_Date %>%
+  group_by(month=floor_date(date, unit="month")) %>%
+  mutate(month2=as.integer(month(month))) %>%
+  filter(month2 > 4  & month2 < 10)%>%
+  group_by(year=year(as.Date(month))) %>%
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+US_NE3_monthly <- US_NE3_Date %>%
+  group_by(month=floor_date(date, unit="month")) %>%
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+US_NE3_weekly <- US_NE3_Date %>%
+  group_by(week=floor_date(date, unit="week")) %>% 
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+
+US_NE3_daily <- US_NE3_Date %>%
+  group_by(day=floor_date(date, unit="day")) %>% 
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+```
+
+```{r Quick Table, echo=FALSE, include=TRUE, eval=TRUE}
+knitr::kable(cbind(c("SOS","EOS","LOS","POP","MGS","PEAK","MSP","MAU"), c("start of season","end of season","length of season","position of peak value (maximum)", "mean growing season value", "peak value (maximum)", "mean spring value","mean autumn value")), caption="Table 1. Phenology metrics", col.names = NA,align='c', row.names=NA)
+```
+
+The irrigated site, US-Ne2 IR, has an additional mean of 187 +/- 110 mm of water per growing season (May through September) reported at the tower (Fig1a). Gridded Daymet precipitation data (1 km) between the two sites more similar, and were thus used for synchrony comparisons (Fig1b).
+
+```{r Fig1, echo=FALSE, warning=FALSE, dpi=300, fig.width=8, fig.cap = "Figure 1. Comparison of annual precipitation between the two flux tower sites as calculated from: a) reported tower-measured precipitation and b) Daymet gridded precipitation (1 km)."}
+merged <- merge(US_NE2_yearly_gs, US_NE3_yearly_gs, by="year") %>%
+  transform(year = seq(2001, 2020, by=1))%>%
+  dplyr::filter(year < 2013) %>%
+  transform(year=as.integer(year))
+
+names(merged) <- c("time", "NE2_GPP", "NE2_Tmx", "NE2_Tmn","NE2_Tpp", "NE2_Dpp", "NE2_DTx", "NE2_DTn","NE3_GPP", "NE3_Tmx", "NE3_Tmn","NE3_Tpp", "NE3_Dpp", "NE3_DTx", "NE3_DTn")
+
+x_scale <- merged %>%
+    filter(complete.cases(merged))  %>%
+    mutate_at(c("NE2_GPP", "NE3_GPP", "NE2_DTx", "NE2_Dpp"), scale)
+
+names(x_scale) <- c("time", "NE2_GPP", "NE2_Tmx", "NE2_Tmn","NE2_Tpp", "Precip", "Tmax", "NE2_DTn","NE3_GPP", "NE3_Tmx", "NE3_Tmn","NE3_Tpp", "NE3_Dpp", "NE3_DTx", "NE3_DTn")
+
+x_ggplot <- melt(x_scale, id.vars="time", measure.vars=c("NE2_GPP", "NE3_GPP", "Tmax", "Precip")) 
+
+  c1 <- round(cor(merged$NE2_GPP, merged$NE2_Dpp, use="complete.obs"),2)
+  c2 <- round(cor(merged$NE3_GPP, merged$NE2_Dpp, use="complete.obs"),2)
+  c3 <- round(cor(merged$NE2_GPP, merged$NE2_DTx, use="complete.obs"),2)
+  c4 <- round(cor(merged$NE3_GPP, merged$NE2_DTx, use="complete.obs"),2)
+  
+  #Melt -> mostly for plotting
+  melted <- melt(merged, id="time")
+  melted$site <- str_sub(melted$variable, 1,3)
+  melted$var <- str_sub(melted$variable, -3,-1)
+  melted$time <- as.Date(paste(melted$time, "01", "01", sep="-"))
+  
+  p1 <- ggplot(subset(melted, var=="Tpp"), aes(x=time, y=value, group=site, color=site))+
+    geom_line(size=1.5)+
+    theme_pubr()+
+    ylab("Tower precipitation (mm)")+
+    scale_colour_manual(values=c("#DF536B", "#29E2E5"))+
+    xlab("time")+
+    ylim(200,800)+
+    scale_x_date(breaks = as.Date(c("2004-01-01", "2009-01-01")))+
+    theme_pubr(base_size=12)
+  
+  p2 <- ggplot(subset(melted, var=="Dpp"), aes(x=time, y=value, group=site, color=site))+
+    geom_line(size=1.5)+
+    theme_pubr()+
+    ylab("Daymet precipitation (mm)")+
+    scale_colour_manual(values=c("#DF536B", "#29E2E5"))+
+    xlab("time")+
+    ylim(200,800)+
+    scale_x_date(breaks = as.Date(c("2004-01-01", "2009-01-01")))+
+    theme_pubr(base_size=12)
+  
+ggarrange(p1,p2, ncol=2, labels=c("a", "b"), common.legend = TRUE)
+```
+
+## Results
+  
+ To assess the relationship between monthly precipitation and growing season GPP, we calculated Pearson’s correlation coefficient between the two time series subsets for both sites. GPP at the irrigated site (NE-2) is weakly negatively correlated with interannual growing season variability in precipitation (r = -0.12; Fig 2a) and uncorrelated with maximum temperature (r = 0.05; Fig 2b). GPP at the rainfed site (NE-3) is weakly positively correlated to interannual variability in growing season precipitation (r =0.15; Fig 2a) and negatively correlated with maximum temperature (r = -0.36; Fig 2b). 
+
+```{r Fig2, echo=FALSE, warning=FALSE, dpi=300, fig.width=8, fig.cap = "Figure 2. Comparison between annual GPP at the two flux tower sites and annual a) precipitation, and b) average daily maximum temperature. The correlation coeffecient (r) between GPP and each variable is reported."}
+#Colors: https://developer.r-project.org/Blog/public/2019/11/21/a-new-palette-for-r/
+
+x_ggplot$time <- as.Date(paste(x_ggplot$time, "01", "01", sep="-"))
+  p13 <- ggplot(subset(x_ggplot, variable !="Tmax"), aes(x=time, y=value, group=variable, color=variable))+
+    geom_line(size=1)+
+    scale_color_manual(values=c("#DF536B", "#29E2E5", "#2297E6","#CD0BBC"))+
+        ylab("Scaled Annual Values")+
+    xlab("Time")+
+    annotate("text", label=paste0("Corr (r) US-Ne2 IR = ", c1, " US-Ne3 RF = ", c2), x=as.Date("2005-01-01"), y=2.5, size=3)+
+    theme(legend.position = "bottom")+
+    scale_x_date(breaks = as.Date(c("2004-01-01", "2009-01-01")))+
+    ylim(-2,2.8)+
+    theme_pubr(base_size=12)+
+      theme(legend.title = element_blank())
+
+  
+  p14 <- ggplot(subset(x_ggplot, variable !="Precip"), aes(x=time, y=value, group=variable, color=variable))+
+    geom_line(size=1)+
+    scale_color_manual(values=c("#DF536B", "#29E2E5", "#CD0BBC"))+
+    ylab("Scaled Annual Values")+
+    xlab("Time")+
+    ylim(-2, 2.8)+
+    annotate("text", label=paste0("Corr (r) US-Ne2 IR = ", c3, "  US-Ne3 RF = ", c4), x=as.Date("2005-01-01"), y=2.5, size=3)+
+    theme(legend.position = "bottom")+
+    scale_x_date(breaks = as.Date(c("2004-01-01", "2009-01-01")))+
+    theme_pubr(base_size=12)+
+    theme(legend.title = element_blank())
+  
+ggarrange(p13,p14, ncol=2, labels=c("a", "b"), common.legend = FALSE)  
+```
+
+Phenology metrics calculated based on 500 m EVI timeseries (2001-2013) indicate less interannual variability in SOS, EOS, LOS at US-Ne2 IR than at the US-Ne3 RF (Table 2). We would expect less interannual variability at the irrigated site if management disrupts synchrony between climate drivers and vegetation productivity.
+
+```{r Pheno_calcs, echo=FALSE, error=TRUE, warning=TRUE, message=FALSE, include=TRUE}
+
+t <- Process_RS("data/Nebraska-All-MOD13A1-006-results.csv","MOD13A1_006__500m_16_days_EVI",as.Date("2001-01-01"))
+
+NE2_NDVI <- t[[1]]
+NE3_NDVI <- t[[2]]
+
+NE2_ts_t <-ts(NE2_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1))
+NE3_ts_t <- ts(NE3_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1))
+
+NE2_ts_flux_t <-ts(US_NE2_daily$GPP, frequency = 365, start = c(2001,1))
+NE3_ts_flux_t <- ts(US_NE3_daily$GPP, frequency =365, start = c(2001,1))
+
+NE2_ts <- as.ts(FillPermanentGaps(NE2_ts_t, min.gapfrac = 0.2, fill=0.15))  
+NE3_ts <-as.ts(FillPermanentGaps(NE3_ts_t, min.gapfrac = 0.2, fill=0.15))
+NE2_ts_flux <- as.ts(FillPermanentGaps(NE2_ts_flux_t, min.gapfrac = 0.1, fill=0.1))    
+NE3_ts_flux <-as.ts(FillPermanentGaps(NE3_ts_flux_t, min.gapfrac = 0.1, fill=0.1))
+
+#For the years that we have flux data 
+spl.trs2 <- Phenology(ts(data=fortify(NE2_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1), frequency=23), tsgf="TSGFspline", approach="White")
+spl.trs3 <- Phenology(ts(data=fortify(NE3_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1), frequency=23), tsgf="TSGFspline", approach="White")
+
+NE2_table <- cbind(c("SOS", "EOS", "LOS", "MSP", "MGS","Peak", "MAU"), as.vector(c(mean(spl.trs2$sos, na.rm=TRUE), mean(spl.trs2$eos, na.rm=TRUE),mean(spl.trs2$los, na.rm=TRUE),mean(spl.trs2$msp, na.rm=TRUE), mean(spl.trs2$mgs, na.rm=TRUE), mean(spl.trs2$peak, na.rm=TRUE), mean(spl.trs2$mau, na.rm=TRUE))), as.vector(c(sd(spl.trs2$sos, na.rm=TRUE), sd(spl.trs2$eos, na.rm=TRUE),sd(spl.trs2$los, na.rm=TRUE),sd(spl.trs2$msp, na.rm=TRUE), sd(spl.trs2$mgs, na.rm=TRUE), sd(spl.trs2$peak, na.rm=TRUE), sd(spl.trs2$mau, na.rm=TRUE))),as.vector(c(mean(spl.trs3$sos, na.rm=TRUE), mean(spl.trs3$eos, na.rm=TRUE),mean(spl.trs3$los, na.rm=TRUE),mean(spl.trs3$msp, na.rm=TRUE), mean(spl.trs3$mgs, na.rm=TRUE), mean(spl.trs3$peak, na.rm=TRUE), mean(spl.trs3$mau, na.rm=TRUE))), as.vector(c(sd(spl.trs3$sos, na.rm=TRUE), sd(spl.trs3$eos, na.rm=TRUE),sd(spl.trs3$los, na.rm=TRUE),sd(spl.trs3$msp, na.rm=TRUE), sd(spl.trs3$mgs, na.rm=TRUE), sd(spl.trs3$peak, na.rm=TRUE), sd(spl.trs3$mau, na.rm=TRUE))))
+
+NE2_table[,2] <-  c(round(as.numeric(NE2_table[1:3,2]),0), round(as.numeric(NE2_table[4:7,2]),3))
+NE2_table[,3] <-  c(round(as.numeric(NE2_table[1:3,3]),0), round(as.numeric(NE2_table[4:7,3]),3))
+NE2_table[,4] <-  c(round(as.numeric(NE2_table[1:3,4]),0), round(as.numeric(NE2_table[4:7,4]),3))
+NE2_table[,5] <-  c(round(as.numeric(NE2_table[1:3,5]),0), round(as.numeric(NE2_table[4:7,5]),3))
+
+knitr::kable(NE2_table, caption="Table 2. Phenology metrics for flux sites US-Ne2 IR and US-Ne3 RF", col.names = c("", "US-Ne2.IR.Mean", "US-Ne2.IR.Stdev", "US-Ne3.RF.Mean", "US-Ne3.RF.Stdev"),align='l', row.names=NA)
+
+times <- as.data.frame(2001:2020)
+names(times) <- "year"
+times$start <- ((times$year-2000)*365 - 364)
+times$end <- ((times$year-2000)*365)
+
+NE2_pheno <- do.call(rbind, lapply(1:20, get_pheno_NE2))
+NE3_pheno <- do.call(rbind, lapply(1:20, get_pheno_NE3))
+
+NE2_pheno_flux <- do.call(rbind, lapply(1:12, get_fluxpheno_NE2))
+NE3_pheno_flux <- do.call(rbind, lapply(1:12, get_fluxpheno_NE3))
+
+US_NE2_yearly_gs_fix <- US_NE2_yearly_gs
+US_NE2_yearly_gs_fix$year <- as.Date(paste((US_NE2_yearly_gs$year), "01", "01", sep="-"))
+US_NE3_yearly_gs_fix <- US_NE3_yearly_gs
+US_NE3_yearly_gs_fix$year <- as.Date(paste((US_NE3_yearly_gs$year), "01", "01", sep="-"))
+
+NE2_ann <- merge(NE2_pheno, US_NE2_yearly, by="year")
+NE3_ann <- merge(NE3_pheno, US_NE3_yearly, by="year")
+
+NE2_gs <- merge(NE2_pheno, US_NE2_yearly_gs_fix, by="year")
+NE3_gs <- merge(NE3_pheno, US_NE3_yearly_gs_fix, by="year")
+
+NE2_ann_flux <- merge(NE2_pheno_flux, US_NE2_yearly, by="year")
+NE3_ann_flux <- merge(NE3_pheno_flux, US_NE3_yearly, by="year")
+
+NE2_gs_flux <- merge(NE2_pheno_flux, US_NE2_yearly_gs_fix, by="year")
+NE3_gs_flux <- merge(NE3_pheno_flux, US_NE3_yearly_gs_fix, by="year")
+
+corrs_NE2_ann <- cor(NE2_ann%>%dplyr::select(daymet_precip, daymet_tmax, daymet_tmin, eos, los, mau, mgs, msp,peak, pop, sos), method = "pearson", use = "complete.obs")
+corrs_NE3_ann <- cor(NE3_ann%>%dplyr::select(daymet_precip, daymet_tmax, daymet_tmin, eos, los, mau, mgs, msp,peak, pop, sos), method = "pearson", use = "complete.obs")
+corrs_NE2_gs <-cor(NE2_gs%>%dplyr::select(daymet_precip, daymet_tmax, daymet_tmin, eos, los, mau, mgs, msp,peak, pop, sos), method = "pearson", use = "complete.obs") 
+corrs_NE3_gs <- cor(NE3_gs%>%dplyr::select(daymet_precip, daymet_tmax, daymet_tmin, eos, los, mau, mgs, msp,peak, pop, sos), method = "pearson", use = "complete.obs")
+corrs_NE2_ann_flux<- cor(NE2_ann_flux[,-c(1, 6, 8:9, 11, 15:17)], method = "pearson", use = "complete.obs")
+corrs_NE3_ann_flux <-cor(NE3_ann_flux[,-c(1, 6, 8:9, 11, 15:17)], method = "pearson", use = "complete.obs")
+corrs_NE2_gs_flux<- cor(NE2_gs_flux[,-c(1, 6, 8:9, 11, 15:17)], method = "pearson", use = "complete.obs") 
+corrs_NE3_gs_flux <- cor(NE3_gs_flux[,-c(1, 6, 8:9, 11, 15:17)], method = "pearson", use = "complete.obs")
+
+cordiffs <- round(corrs_NE2_ann -corrs_NE3_ann , 1)
+cordiffs_gs <- round(corrs_NE2_gs -corrs_NE3_gs , 1)
+
+cordiffs_flux <- round(corrs_NE2_ann_flux -corrs_NE3_ann_flux , 1)
+cordiffs_gs_flux  <- round(corrs_NE2_gs_flux -corrs_NE3_gs_flux , 1)
+```
+
+Further analysis of the satellite-derived relationship between phenology metrics and precipitation supports stronger synchrony between climate and vegetation productivity at the rainfed site (US-Ne3 RF) than the irrigated site (US-Ne2 IR). Interannual variability in EVI-derived autumn and growing season phenology metrics show a strong relationship with precipitation at the rainfed site (US-Ne3 RF), but not at the irrigated site (US-Ne2 IR). The three phenology metrics displaying this pattern include: peak EVI (Fig 3), mean growing season value (MGS) (Fig 4), and mean autumn value (MAU) (Fig 5).
+
+```{r Fig EVI/Precip, echo=FALSE, error=TRUE, warning= FALSE, message=FALSE, fig.width=8, fig.cap = "Figure 3. Comparison between annual peak EVI and precipitation, at a) US-Ne2 IR and b) US-Ne3 RF. The coefficient of determination (R^2^) and p-value are reported for each linear fit. Only fits significant at the p < 0.05 level are drawn."}
+NE2_ann$site <- "US-Ne2.IR"
+NE3_ann$site <- "US-Ne3.RF"
+NE2_gs$site <- "US-Ne2.IR"
+NE3_gs$site <- "US-Ne3.RF"
+NE2_ann_flux$site <- "US-Ne2.IR"
+NE3_ann_flux$site <- "US-Ne3.RF"
+NE2_gs_flux$site <- "US-Ne2.IR"
+NE3_gs_flux$site <- "US-Ne3.RF"
+
+#If any corrs look weird: 
+#cor(NE2_ann$los, NE2_ann$eos)
+#cor(NE3_ann$los, NE3_ann$eos)
+#cor(NE3_ann$eos, NE3_ann$mgs)
+#cor(NE2_ann$eos, NE2_ann$mgs)
+
+#return x & y variables where the correlation difference is greater than 0.4
+x <- as.data.frame(corrs_NE2_ann-corrs_NE3_ann)
+y <- as.data.frame(corrs_NE2_gs-corrs_NE3_gs)
+z <- as.data.frame(corrs_NE2_gs_flux-corrs_NE3_gs_flux)
+aa <- as.data.frame(corrs_NE2_ann_flux-corrs_NE3_ann_flux)
+
+#EVI
+ggregression_wrap(x="peak", y="daymet_precip", z="EVI", b="Peak", a="Precipitation (mm)")
+```
+
+
+```{r Fig EVImgs/Precip, echo=FALSE, error=TRUE, warning= FALSE, message=FALSE, fig.width=8, fig.cap = "Figure 4. Comparison between mean growing season EVI and precipitation, at a) US-Ne2 IR and b) US-Ne3 RF. The coefficient of determination (R^2^) and p-value are reported for each linear fit. Fits significant at the p < 0.05 level are drawn with a red line, and nonsignificant fits with p < 0.1 are drawn with a dashed red line."}
+ggregression_wrap(x="mgs", y="daymet_precip", z="EVI",b="MGS", a="Precipitation (mm)")
+```
+
+```{r Fig EVImau/Precip, echo=FALSE, error=TRUE, warning= FALSE, message=FALSE, fig.width=8, fig.cap = "Figure 5. Comparison between mean autumn EVI and precipitation, at a) US-Ne2 IR and b) US-Ne3 RF. The coefficient of determination (R^2^) and p-value are reported for each linear fit. Fits significant at the p < 0.05 level are drawn with a red line, and nonsignificant fits with p < 0.1 are drawn with a dashed red line."}
+ggregression_wrap(x="mau", y="daymet_precip", z="EVI", b="MAU", a="Precipitation (mm)")
+```
+
+
+Together, results from remotely sensed vegetation greenness and eddy covariance provide support for our hypothesis that the rainfed site (US-Ne3 RF) would demonstrate greater synchrony with climate drivers (precipitation and temperature) than the irrigated site (US-Ne2 IR). More broadly, these results suggest that management interventions like irrigation can potentially disrupt synchrony between ecosystem processes and climate drivers.
+
+```{r Extra text,echo=FALSE, error=TRUE, warning= FALSE, message=FALSE, eval=FALSE}
+"Results were similar using phenology metrics derived from flux tower data, where the rainfed site (US-Ne3 RF) was more sensitive to climate drivers than the irrigated site (US-Ne2 IR) for peak GPP (Fig 6), timing of peak GPP (Fig 7), mean growing season GPP, and mean autumn GPP. However, with the flux GPP data, results were sensitive to maximum temperature rather than precipitation. We expect this is because variation in high-temporal resolution GPP is most sensitive to day-to-day changes in temperature, while vegetation indices like EVI change more slowly and reflect weekly and monthly shifts in meteorological patterns [@barnesVegetationProductivityResponds2016]."
+```
