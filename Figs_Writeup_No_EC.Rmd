@@ -51,8 +51,8 @@ Winter gaps in EVI timeseries for both sites filled used using the "fillpermanen
 
 ```{r Data_Processing, echo=FALSE, include=FALSE, eval=TRUE, cache=TRUE, fig.show='hide'}
 #Not using the flux data anymore, but still needed for code to run properly, could clean up. 
-US_NE2 <- read.csv("data/FLX_US-Ne2_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne2_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
-US_NE3 <- read.csv("data/FLX_US-Ne3_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne3_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
+US_NE2 <- read.csv("./productivity/data/FLX_US-Ne2_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne2_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
+US_NE3 <- read.csv("./productivity/data/FLX_US-Ne3_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne3_FLUXNET2015_FULLSET_DD_2001-2013_1-4.csv")
 
 #For Each Site: 
 #Aggregate (daily, weekly, monthly, yearly)
@@ -64,8 +64,8 @@ US_NE3 <- read.csv("data/FLX_US-Ne3_FLUXNET2015_FULLSET_2001-2013_1-4/FLX_US-Ne3
 #3) Aggregate to yearly timeseries of GPP & Climate Drivers
 
 #Daymet_Data 
-NE2_Daymet <- read.csv("data/NE_211742_lat_41.1649_lon_-96.4701_2022-02-02_122643.csv", skip=7)
-NE3_Daymet <- read.csv("data/NE_311742_lat_41.1797_lon_-96.4397_2022-02-02_122805.csv", skip=7)
+NE2_Daymet <- read.csv("./productivity/data/NE_211742_lat_41.1649_lon_-96.4701_2022-02-02_122643.csv", skip=7)
+NE3_Daymet <- read.csv("./productivity/data/NE_311742_lat_41.1797_lon_-96.4397_2022-02-02_122805.csv", skip=7)
 
 NE2_Daymet <- NE2_Daymet %>%
   mutate(date= as.Date(paste(year, yday, sep="-"), format="%Y-%j"))%>%
@@ -99,7 +99,7 @@ US_NE2_Date <- merge(US_NE2_Date, NE2_Daymet, by="date",all.y=TRUE)
 
 US_NE2_yearly <- US_NE2_Date %>%
   group_by(year=floor_date(date, unit="year")) %>%
-    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 
 US_NE2_yearly_gs <- US_NE2_Date %>%
@@ -107,18 +107,18 @@ US_NE2_yearly_gs <- US_NE2_Date %>%
   mutate(month2=as.integer(month(month))) %>%
   filter(month2 > 4  & month2 < 10)%>%
   group_by(year=year(as.Date(month))) %>%
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 US_NE2_monthly <- US_NE2_Date %>%
   group_by(month=floor_date(date, unit="month")) %>%
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 US_NE2_weekly <- US_NE2_Date %>%
   group_by(week=floor_date(date, unit="week")) %>% 
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 US_NE2_daily <- US_NE2_Date %>%
   group_by(day=floor_date(date, unit="day")) %>% 
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 #NE3 Next-------
 US_NE3_Date <- US_NE3 %>%
   mutate(TIMESTAMP = ymd(TIMESTAMP), 
@@ -139,7 +139,7 @@ US_NE3_Date <- merge(US_NE3_Date, NE3_Daymet, by="date",all.y=TRUE)
 
 US_NE3_yearly <- US_NE3_Date %>%
   group_by(year=floor_date(date, unit="year")) %>%
-    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+    summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 
 US_NE3_yearly_gs <- US_NE3_Date %>%
@@ -147,19 +147,19 @@ US_NE3_yearly_gs <- US_NE3_Date %>%
   mutate(month2=as.integer(month(month))) %>%
   filter(month2 > 4  & month2 < 10)%>%
   group_by(year=year(as.Date(month))) %>%
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 US_NE3_monthly <- US_NE3_Date %>%
   group_by(month=floor_date(date, unit="month")) %>%
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 US_NE3_weekly <- US_NE3_Date %>%
   group_by(week=floor_date(date, unit="week")) %>% 
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 
 US_NE3_daily <- US_NE3_Date %>%
   group_by(day=floor_date(date, unit="day")) %>% 
-  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=RobustMax(TA_ERA_DAY), temp_min=RobustMin(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
+  summarize(GPP=sum(GPP_NT_CUT_50, na.rm=TRUE), temp_max=max(TA_ERA_DAY), temp_min=min(TA_ERA_DAY), tower_precip=sum(P_F, na.rm=TRUE), daymet_precip=sum(Daymet_Precip, na.rm=TRUE), daymet_tmax=mean(Daymet_Tmax, na.rm=TRUE), daymet_tmin=mean(Daymet_Tmin, na.rm=TRUE))
 ```
 
 ```{r Quick Table, echo=FALSE, include=TRUE, eval=TRUE}
@@ -258,13 +258,13 @@ Phenology metrics calculated based on 500 m EVI timeseries (2001-2013) indicate 
 
 ```{r Pheno_calcs, echo=FALSE, error=TRUE, warning=TRUE, message=FALSE, include=TRUE}
 
-t <- Process_RS("data/Nebraska-All-MOD13A1-006-results.csv","MOD13A1_006__500m_16_days_EVI",as.Date("2001-01-01"))
+t <- Process_RS("./productivity/data/Nebraska-All-MOD13A1-006-results.csv","MOD13A1_006__500m_16_days_EVI",as.Date("2001-01-01"))
 
 NE2_NDVI <- t[[1]]
 NE3_NDVI <- t[[2]]
 
-NE2_ts_t <-ts(NE2_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1))
-NE3_ts_t <- ts(NE3_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1))
+NE2_ts_t <-ts(NE2_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1) %>% as.numeric())
+NE3_ts_t <- ts(NE3_NDVI$y, frequency = 23, start = c(NE2_NDVI$year[1],1)%>% as.numeric())
 
 NE2_ts_flux_t <-ts(US_NE2_daily$GPP, frequency = 365, start = c(2001,1))
 NE3_ts_flux_t <- ts(US_NE3_daily$GPP, frequency =365, start = c(2001,1))
@@ -275,8 +275,8 @@ NE2_ts_flux <- as.ts(FillPermanentGaps(NE2_ts_flux_t, min.gapfrac = 0.1, fill=0.
 NE3_ts_flux <-as.ts(FillPermanentGaps(NE3_ts_flux_t, min.gapfrac = 0.1, fill=0.1))
 
 #For the years that we have flux data 
-spl.trs2 <- Phenology(ts(data=fortify(NE2_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1), frequency=23), tsgf="TSGFspline", approach="White")
-spl.trs3 <- Phenology(ts(data=fortify(NE3_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1), frequency=23), tsgf="TSGFspline", approach="White")
+spl.trs2 <- Phenology(ts(data=fortify(NE2_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1) %>% as.numeric(), frequency=23), tsgf="TSGFspline", approach="White")
+spl.trs3 <- Phenology(ts(data=fortify(NE3_ts) %>% filter(Index < 2013) %>% dplyr::select(-Index), start=c(NE2_NDVI$year[1],1) %>% as.numeric(), frequency=23), tsgf="TSGFspline", approach="White")
 
 NE2_table <- cbind(c("SOS", "EOS", "LOS", "MSP", "MGS","Peak", "MAU"), as.vector(c(mean(spl.trs2$sos, na.rm=TRUE), mean(spl.trs2$eos, na.rm=TRUE),mean(spl.trs2$los, na.rm=TRUE),mean(spl.trs2$msp, na.rm=TRUE), mean(spl.trs2$mgs, na.rm=TRUE), mean(spl.trs2$peak, na.rm=TRUE), mean(spl.trs2$mau, na.rm=TRUE))), as.vector(c(sd(spl.trs2$sos, na.rm=TRUE), sd(spl.trs2$eos, na.rm=TRUE),sd(spl.trs2$los, na.rm=TRUE),sd(spl.trs2$msp, na.rm=TRUE), sd(spl.trs2$mgs, na.rm=TRUE), sd(spl.trs2$peak, na.rm=TRUE), sd(spl.trs2$mau, na.rm=TRUE))),as.vector(c(mean(spl.trs3$sos, na.rm=TRUE), mean(spl.trs3$eos, na.rm=TRUE),mean(spl.trs3$los, na.rm=TRUE),mean(spl.trs3$msp, na.rm=TRUE), mean(spl.trs3$mgs, na.rm=TRUE), mean(spl.trs3$peak, na.rm=TRUE), mean(spl.trs3$mau, na.rm=TRUE))), as.vector(c(sd(spl.trs3$sos, na.rm=TRUE), sd(spl.trs3$eos, na.rm=TRUE),sd(spl.trs3$los, na.rm=TRUE),sd(spl.trs3$msp, na.rm=TRUE), sd(spl.trs3$mgs, na.rm=TRUE), sd(spl.trs3$peak, na.rm=TRUE), sd(spl.trs3$mau, na.rm=TRUE))))
 
