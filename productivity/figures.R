@@ -23,7 +23,7 @@ p_metric<-ggplot(NE_df)+
 NE_ann_df<-bind_rows(NE2_ann %>% mutate(site="IR"), NE3_ann%>% mutate(site="RF"))
 
 p_reg<-ggplot(NE_ann_df %>% 
-         dplyr::select(site, year, daymet_precip, peak, mgs) %>% 
+         dplyr::select(site, year, daymet_precip, Peak=peak, MGS=mgs) %>% 
          tidyr::gather(key="metric", value="value", -site, -year,-daymet_precip) %>% 
            mutate(value_plot=case_when(site=="RF"~value)))+
   geom_point(aes(x=daymet_precip, y=value))+
@@ -38,7 +38,9 @@ p_reg<-ggplot(NE_ann_df %>%
     show.legend=F
   )+
   facet_grid(vars(metric), vars(site), scales = "free")+
-  theme_classic()
+  theme_classic()+
+  ylab("")+
+  xlab("Total annual precipitation (mm)")
 
 library(gridExtra)
 grid.arrange(p_metric, p_reg, ncol=1)
