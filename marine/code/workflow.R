@@ -10,11 +10,13 @@ p_load(maptools)
 p_load(rgeos)
 p_load(gridExtra)
 p_load(geosphere)
+p_load(tsibble)
+p_load(fable)
 
 path<-"./marine/"
 data<-read_csv(paste0(path,"data/bethany_bottomtrawl_fall.csv")) %>% 
   dplyr::select(-SEASON, -name, -LAT, -LON) %>% 
-  gather(key="species", value="CPUE", -YEAR, -STRATUM, -NTOWS, -midlat, -midlon, -group) %>% 
+  tidyr::gather(key="species", value="CPUE", -YEAR, -STRATUM, -NTOWS, -midlat, -midlon, -group) %>% 
   mutate(abundance=abs(CPUE)) %>% 
   mutate(logabun=log(abundance+1)) %>% 
   mutate(site=paste0(midlon,"_", midlat))
@@ -50,8 +52,8 @@ p_map<-ggplot()+
   #             distinct(midlon, midlat, id),
   #           aes(x=midlon, y=midlat, label=id))+
   theme_minimal()+
-  xlab("longitude")+
-  ylab("latitude")+
+  xlab("Longitude")+
+  ylab("Latitude")+
   guides(col=guide_legend(title=""))+
   coord_equal()
 p_map
@@ -76,7 +78,7 @@ for (i in 1:length(sp_list)) {
     as_tsibble(index = YEAR, key=id)
   lm_df <- data_tsbl %>%
     model(TSLM(logabun ~ YEAR)) %>%
-    tidy(fit) %>% 
+    broom::tidy(fit) %>% 
     dplyr::select(id, term, estimate) %>% 
     spread(key="term", value="estimate") %>% 
     rename(intercept=`(Intercept)`, beta=YEAR)
@@ -100,7 +102,7 @@ for (i in 1:length(sp_list)) {
     geom_line(aes(x=YEAR, y=logabun, col=site, group=site), alpha=0.5)+
     guides(col="none")+
     theme_classic()+
-    xlab("year")+
+    xlab("Year")+
     ylab("log (CPUE + 1)")
     if (i==8) {
     p_ts_1sp<-p_ts
@@ -122,7 +124,7 @@ for (i in 1:length(sp_list)) {
   
   corr_df<-as.data.frame(res) %>% 
     rownames_to_column(var="start") %>% 
-    gather(key="end", value = "correlation", -start) %>%
+    tidyr::gather(key="end", value = "correlation", -start) %>%
     mutate(start=as.integer(start),
            end=as.integer(end)) %>% 
     left_join(coord_df, by=c("start"="id")) %>% 
@@ -148,10 +150,11 @@ for (i in 1:length(sp_list)) {
                    filter(distance<=quantile(corr_df$distance, 0.5))
                  ,aes(x=start_lon, y=start_lat, xend=end_lon, yend=end_lat, alpha=abs(correlation), col=correlation))+
     scale_color_viridis_c()+
-    guides(alpha="none")+
+    guides(alpha="none",
+           col=guide_legend(title="Correlation"))+
     theme_minimal()+
-    xlab("longitude")+
-    ylab("latitude")+
+    xlab("Longitude")+
+    ylab("Latitude")+
     coord_equal()
   
   if (i==8) {
@@ -187,8 +190,8 @@ for (i in 1:length(sp_list)) {
     geom_vline(xintercept = range*100, lty=2, col="red")+
     xlim(-50,12*100+50)+
     # ylim(0,1)+
-    ylab ("pairwise correlation coefficient")+
-    xlab ("distance (km)")+
+    ylab ("Pairwise correlation coefficient")+
+    xlab ("Distance (km)")+
     theme_classic()
   # p_decay
   if (i==8) {
@@ -225,8 +228,8 @@ management=c(0, 1, 0, 1, 0,
 
 sync_df<-tibble(species=sp_list, decay_df,
                     management=management) %>% 
-  mutate(management=case_when(management==0~"unmanaged",
-                           management==1~"managed")) %>% 
+  mutate(management=case_when(management==0~"Unmanaged",
+                           management==1~"Managed")) %>% 
   arrange(species)
 
 
@@ -241,8 +244,8 @@ abundance_df<-data %>%
   dplyr::select(species, roc = estimate, p = p.value) %>% 
   ungroup() %>% 
   mutate(management=management) %>% 
-  mutate(management=case_when(management==0~"unmanaged",
-                              management==1~"managed")) %>% 
+  mutate(management=case_when(management==0~"Unmanaged",
+                              management==1~"Managed")) %>% 
   arrange(species)
 
 summary_df<-full_join(sync_df, abundance_df %>% dplyr::select(-p),by=c("species", "management"))
@@ -251,9 +254,9 @@ p_summary<-ggplot(summary_df %>%
                     mutate(range=range*100) %>% 
                     dplyr::select(species, management, 
                                   # `mean correlation`=mean,
-                                  `distance where correlation decays to half (km)`=range,
-                                  `rate of change in CPUE (per year)`=roc) %>% 
-                    gather(key="var", value="value", -species, -management)  %>% 
+                                  `Distance where correlation decays to half (km)`=range,
+                                  `Rate of change in CPUE (per year)`=roc) %>% 
+                    tidyr::gather(key="var", value="value", -species, -management)  %>% 
                     mutate(var=as.factor(var)))+
   geom_boxplot(aes(x=management, y=value))+
   geom_point(aes(x=management, y=value), cex=2, col="red", pch=1)+
@@ -266,30 +269,30 @@ print(p_summary)
 dev.off()
 
 pdf(paste0(path, 'output/ts_map_decay_box.pdf'), width = 12, height = 10)
-grid.arrange(annotate_figure(p_ts_1sp, fig.lab = "A"),
-             annotate_figure(p_corrmap_1sp, fig.lab = "B"),
-             annotate_figure(p_decay_1sp, fig.lab = "C"),
-             annotate_figure(p_summary, fig.lab = "D"),
+grid.arrange(annotate_figure(p_ts_1sp, fig.lab = "(a)"),
+             annotate_figure(p_corrmap_1sp, fig.lab = "(b)"),
+             annotate_figure(p_decay_1sp, fig.lab = "(c)"),
+             annotate_figure(p_summary, fig.lab = "(d)"),
              layout_matrix=rbind(c(1,2),
                                  c(3, 4))
 )
 dev.off()
 
 summary_df %>%
-  gather(key="var", value="value", -species, -management) %>% 
+  tidyr::gather(key="var", value="value", -species, -management) %>% 
   filter(var!="number of pairs of sites") %>%  
   group_by(management, var) %>% 
   summarise(mean=mean(value),
             sd=sd(value))
 
-t.test(sync_df %>% filter(management=="managed") %>% pull(range),
-       sync_df %>% filter(management=="unmanaged") %>% pull(range),
+t.test(sync_df %>% filter(management=="Managed") %>% pull(range),
+       sync_df %>% filter(management=="Unmanaged") %>% pull(range),
        alternative = "less")
 
-t.test(sync_df %>% filter(management=="managed") %>% pull(mean),
-       sync_df %>% filter(management=="unmanaged") %>% pull(mean),
+t.test(sync_df %>% filter(management=="Managed") %>% pull(mean),
+       sync_df %>% filter(management=="Unmanaged") %>% pull(mean),
        alternative = "greater")
 
-t.test(abundance_df %>% filter(management=="managed") %>% pull(roc),
-       abundance_df %>% filter(management=="unmanaged") %>% pull(roc),
+t.test(abundance_df %>% filter(management=="Managed") %>% pull(roc),
+       abundance_df %>% filter(management=="Unmanaged") %>% pull(roc),
        alternative = "greater")

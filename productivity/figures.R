@@ -1,6 +1,5 @@
-NE_df<-data.frame(NE2_table)
-colnames(NE_df)<- c("metric", "US-Ne2.IR.Mean", "US-Ne2.IR.Stdev", "US-Ne3.RF.Mean", "US-Ne3.RF.Stdev")
-NE_df<-NE_df %>% 
+NE_df<-data.frame(NE2_table) %>% 
+  `colnames<-` (c("metric", "US-Ne2.IR.Mean", "US-Ne2.IR.Stdev", "US-Ne3.RF.Mean", "US-Ne3.RF.Stdev")) %>% 
   tidyr::gather(key="sitestat", value="value", -metric) %>% 
   rowwise () %>% 
   mutate(site=str_split(sitestat,pattern="\\.",simplify = T)[2]) %>% 
@@ -9,7 +8,10 @@ NE_df<-NE_df %>%
   dplyr::select(-sitestat) %>% 
   spread(key="stat", value="value") %>% 
   mutate(Mean=as.numeric(Mean),
-         Stdev=as.numeric(Stdev))
+         Stdev=as.numeric(Stdev)) %>% 
+  filter(!metric %in% c("MSP", "MAU")) %>% 
+  mutate(metric=as.factor(metric)) %>% 
+  mutate(metric=fct_relevel(metric, levels=c("SOS", "EOS", "LOS", "MGS", "Peak")))
   
 
 p_metric<-ggplot(NE_df)+
@@ -17,7 +19,8 @@ p_metric<-ggplot(NE_df)+
   geom_errorbar(aes(x=site, ymin=Mean-1.95*Stdev, ymax=Mean+1.95*Stdev))+
   facet_wrap(.~metric, nrow=1, scales = "free_y")+
   theme_classic()+
-  ylab("")
+  ylab("Value of phenological metric")+
+  xlab("Site")
 
 
 NE_ann_df<-bind_rows(NE2_ann %>% mutate(site="IR"), NE3_ann%>% mutate(site="RF"))
@@ -30,26 +33,26 @@ p_reg<-ggplot(NE_ann_df %>%
   geom_smooth(aes(x=daymet_precip, y=value_plot), method="lm")+
   ggpubr::stat_cor(
     aes(x = daymet_precip, y = value, group = interaction( metric, site),
-        col = interaction( metric, site),
-        label = paste(..r.label.., ..p.label.., sep = "*`,`~")),
+        # col = interaction( metric, site),
+        label = paste(..rr.label.., ..p.label.., sep = "*`,`~")),
     # p.accuracy = 0.05,
     label.x.npc = "left",
     label.y.npc = "top",
-    show.legend=F
+    show.legend=F,
+    col="blue"
   )+
   facet_grid(vars(metric), vars(site), scales = "free")+
   theme_classic()+
-  ylab("")+
+  ylab("Value of phenological metric")+
   xlab("Total annual precipitation (mm)")
 
 library(gridExtra)
-grid.arrange(p_metric, p_reg, ncol=1)
 
 path<-"./productivity/"
 dir.create(paste0(path, "output/"))
-pdf(paste0(path, 'output/metric_regression.pdf'), width = 10, height = 10)
-grid.arrange(annotate_figure(p_metric, fig.lab = "A"),
-             annotate_figure(p_reg, fig.lab = "B"),
+pdf(paste0(path, 'output/metric_regression.pdf'), width = 8, height = 8)
+grid.arrange(annotate_figure(p_metric, fig.lab = "(a)"),
+             annotate_figure(p_reg, fig.lab = "(b)"),
              layout_matrix=rbind(c(1),
                                  c(2),
                                  c(2))

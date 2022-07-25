@@ -15,6 +15,7 @@ p_load(rnaturalearth)
 p_load(gridExtra)
 p_load(ggpubr)
 # load data ----------------------------------------------------------------
+path<-"./avian/"
 path_in<-paste0(path,"data/processed/")
 files<-list.files(path_in, full.names = T)
 m_data_list<-vector(mode="list", length=length(files))
@@ -27,6 +28,25 @@ data_p<-bind_rows(m_data_list)
 load(paste0(path, "data/bbs_raw_data.RData"))
 strat_data <- stratify(by = 'bbs_cws', bbs_data = bbs_data)
 
+#filter for only passerines
+spstrat <- strat_data$species_strat
+
+bstrat <- strat_data$bird_strat
+RID_df <- bstrat %>%
+  dplyr::distinct(statenum, Route) %>%
+  dplyr::arrange(statenum, Route) %>%
+  dplyr::mutate(RID = 1:NROW(.))
+route_df <- strat_data$route_strat %>%
+  dplyr::select(statenum, Route, RouteName,
+                Latitude, Longitude) %>%
+  dplyr::distinct()
+bstrat2 <- left_join(bstrat, RID_df, by = c('statenum', 'Route')) %>%
+  left_join(route_df, by = c('statenum', 'Route')) %>%
+  dplyr::mutate(log_count = log(SpeciesTotal)) %>%
+  dplyr::arrange(RID, AOU, Year) %>%
+  dplyr::select(RID, RouteName, AOU, Year, SpeciesTotal, log_count, BCR, Latitude, Longitude)
+uRID <- unique(bstrat2$RID)
+
 # time series plot
 tplt <- dplyr::left_join(data_p, spstrat, by = c('AOU' = 'sp.bbs')) %>%
   dplyr::filter(order == 'Passeriformes') %>% 
@@ -35,16 +55,13 @@ p_ts <- ggplot(tplt, aes(Year, residuals, color = factor(AOU))) +
   geom_line(alpha = 0.5) +
   theme_classic() +
   theme(legend.pos = 'none') +
-  xlab('year') +
-  ylab('log (count) residuals') +
-  ggtitle(paste0("Site: ",tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
+  xlab('Year') +
+  ylab('log (count) residuals') #+
+  # ggtitle(paste0("Site: ",tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
 p_ts
 # stats data --------------------------------------------------------------
 
-#filter for only passerines
-spstrat <- strat_data$species_strat
-data <- dplyr::left_join(data_p, spstrat, by = c('AOU' = 'sp.bbs')) %>%
-  dplyr::filter(order == 'Passeriformes')
+
 
 
 
@@ -100,6 +117,7 @@ out<-read_rds(paste0(path, 'data/pro-cc.rds'))
 
 out2 <- out %>% filter(nsp >= 10, nyr >= 10)
 world <- rnaturalearth::ne_coastline(returnclass = 'sf')
+world<-as(world, 'Spatial')
 # circle <- st_point(x = c(0,0)) %>% st_buffer(dist = 10000000) %>% 
 #   st_sfc(crs = 4326)
 
@@ -121,12 +139,10 @@ range(out2$nyr)
 #map of synchrony across space
 
 p_map <- ggplot() +
-  geom_sf(data = world, 
-          #fill = 'grey89') +
-          fill = 'white') +
+  geom_path(data = world, aes(x = long, y = lat, group = group)) +
   #geom_point(data = out, inherit.aes = FALSE, aes(lon, lat, col = mn_cc_lc), size = 1.5, alpha = 0.3) +
   geom_point(data = out2 %>% mutate(rank=rank(mn_cc_rs)), inherit.aes = FALSE, aes(lon, lat, col = rank), size = 1.5, alpha = 0.3) +
-  labs(color = 'mean pairwise correlation coefficient') +
+  labs(color = 'Correlation') +
   # scale_color_gradient2(low = '#C7522B', mid = '#FBF2C4', high = '#3C5941',
   #                      #earth
   #                      # scale_fill_gradient2(low = '#A36B2B', mid = '#EDEAC2', high = '#2686A0',
@@ -144,14 +160,17 @@ p_map <- ggplot() +
                            pull(rank), 
                          label=c(0, 0.1, 0.2, 0.3, 0.6))+
   geom_point(data=tplt %>% distinct(Longitude, Latitude), aes(x=Longitude, y=Latitude), col="red", pch=10, cex=6, lwd=2)+
-  xlab("longitude")+
-  ylab("latitude")+
+  xlab("Longitude")+
+  ylab("Latitude")+
   theme_minimal() +
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
   theme(legend.position="bottom")+
   theme(legend.key.height= unit(0.5, 'cm'),
         legend.key.width= unit(1.5, 'cm'))+
   xlim(c(-170, -50)) +
-  ylim(c(20, 75))
+  ylim(c(20, 75))+
+  coord_map("bonne", lat0 = 50)
 p_map
 
 
@@ -183,8 +202,8 @@ out5 <- dplyr::mutate(out2, HFI = eval3) %>%
 plt6 <- ggplot(out5, aes(x = HFI, y = mn_cc_rs, color = factor(BCR))) +
   geom_point(alpha = 0.3) +
   theme_bw() +
-  xlab('Human Footprint Index') +
-  ylab('mean pairwise correlation coefficient') +
+  xlab('HFI') +
+  ylab('Mean pairwise correlation coefficient') +
   geom_line(stat = 'smooth', method = 'lm', size = 3, alpha = 0.5)
 
 pdf('./avian/output/sync_hfi.pdf',width = 6, height = 4)
@@ -225,7 +244,7 @@ p_contour<- ggplot()+
   geom_contour(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p))+
   metR::geom_label_contour(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p), skip = 0)+
   ylab ('Number of species')+
-  xlab("Human Footprint Index (HFI)")+
+  xlab("HFI")+
   scale_color_viridis_c( breaks = out5 %>% 
                            mutate(rank=rank(mn_cc_rs)) %>%
                            arrange(mn_cc_rs) %>% 
@@ -250,11 +269,11 @@ print(p_contour)
 dev.off()
 
 pdf(paste0(path, 'output/ts_map_cont.pdf'), width = 12, height = 8)
-grid.arrange(annotate_figure(p_ts, fig.lab = "A"),
-             annotate_figure(p_map, fig.lab = "B"),
-             annotate_figure(p_contour, fig.lab = "C"),
-             layout_matrix=rbind(c(1,1,1),
-                                 c(2,2,3),
-                                 c(2,2,3))
+grid.arrange(annotate_figure(p_ts, fig.lab = "(a)"),
+             annotate_figure(p_map, fig.lab = "(b)"),
+             annotate_figure(p_contour, fig.lab = "(c)"),
+             layout_matrix=rbind(c(1,1),
+                                 c(2,3),
+                                 c(2,3))
              )
 dev.off()

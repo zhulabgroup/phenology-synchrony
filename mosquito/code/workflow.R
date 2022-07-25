@@ -26,9 +26,10 @@ p_map<-ggplot()+
   geom_label_repel(data=site_df,
             aes(x=lon, y=lat, label=Site))+
   theme_minimal()+
-  xlab("longitude")+
-  ylab("latitude")+
-  coord_equal()
+  xlab("Longitude")+
+  ylab("Latitude")+
+  # coord_equal()+
+  coord_map("bonne", lat0 = 50)
 
 count.df <- full.df %>%
   group_by(Site, Year, SciName, DOY) %>% 
@@ -73,8 +74,8 @@ p_ts<-ggplot()+
   facet_wrap(.~Year, ncol=1, scales="free_y")+
   guides(fill="none",
          col="none")+
-  xlab("day of year")+
-  ylab ("cumulated abundance")+
+  xlab("Day of year")+
+  ylab ("Cumulated abundance")+
   ggtitle(expression(paste("Site: HARV  Species: ",italic("Aedes trivittatus"))))
 p_ts
 
@@ -149,8 +150,8 @@ p_corr<-ggplot()+
               aes(x=mat, y = TDays),method="lm", se=T, col="black")+
   facet_wrap(.~SciName, scales="free_y")+
   theme_classic()+
-  xlab("mean annual temperature (°C)")+
-  ylab ("mosquito season length (day)")+
+  xlab("Mean annual temperature (°C)")+
+  ylab ("Mosquito season length (day)")+
   guides(col="none")+
   theme(strip.text = element_text(face = "italic"))
 p_corr
@@ -162,8 +163,8 @@ p_summary<-ggplot()+
   geom_errorbar(data=reg_df %>% filter(p<0.05), aes(x=SciName, ymin=estimate-1.96*se, ymax=estimate+1.96*se), col="blue")+
   geom_hline(yintercept = 0, lty=2)+
   theme_classic()+
-  xlab("species")+
-  ylab ("regression coefficient (day / °C)")+
+  xlab("Species")+
+  ylab ("Regression coefficient (day / °C)")+
   coord_flip()+
   scale_x_discrete(limits=rev)+
   theme(axis.text.y = element_text(face = "italic"))
@@ -172,10 +173,10 @@ summary(reg_df$estimate>0)
 summary(reg_df$p<0.05)
 
 pdf(paste0(path, 'output/map_ts_corr_sum.pdf'), width = 12, height = 8)
-grid.arrange(annotate_figure(p_map, fig.lab = "A"),
-             annotate_figure(p_ts, fig.lab = "B"),
-             annotate_figure(p_corr, fig.lab = "C"),
-             annotate_figure(p_summary, fig.lab = "D"),
+grid.arrange(annotate_figure(p_map, fig.lab = "(a)"),
+             annotate_figure(p_ts, fig.lab = "(b)"),
+             annotate_figure(p_corr, fig.lab = "(c)"),
+             annotate_figure(p_summary, fig.lab = "(d)"),
              layout_matrix=rbind(c(1,2),
                                  c(3, 4))
 )

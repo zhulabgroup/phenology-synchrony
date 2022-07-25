@@ -1,4 +1,5 @@
 library(tidyverse)
+library(pracma)
 
 scale_dict<-read_csv("./synchrony scale.csv", skip=0,n_max = 5)
 
@@ -31,7 +32,7 @@ for (i in 1:nrow(scale_sum)) {
   dim(y)<-NULL
   z <- sin(theta) *  scale_sum$loo_r[i]/2 +scale_sum$loo_m[i]
   dim(z)<-NULL
-  ell_df_list[[i]]<-data_frame(x=x, y=y, z=z, name=scale_sum$Name[i])
+  ell_df_list[[i]]<-tibble(x=x, y=y, z=z, name=scale_sum$Name[i])
 }
 ell_df<-bind_rows(ell_df_list)
 
@@ -45,21 +46,21 @@ p<-plot_ly() %>%
     x = ~ss_m, y = ~ts_m, z = ~loo_m-0.25, text=~as.factor(Name),
     opacity=1) %>% 
   layout(scene = list(xaxis=list(
-    title = "·<b><br><br><br>spatial scale</b>",
+    title = "·<b><br><br><br>Spatial scale</b>",
     ticketmode = 'array',
     ticktext = c("Single-<br>location", "Multiple-<br>locations"),
     tickvals = c(2,4),
     range = c(0,5)
   ),
   yaxis=list(
-    title = "·<b><br><br><br>temporal scale</b>",
+    title = "·<b><br><br><br>Temporal scale</b>",
     ticketmode = 'array',
     ticktext = c("Intra-<br>annual", "Inter-<br>annual"),
     tickvals = c(2,4),
     range = c(0,5)
   ),
   zaxis=list(
-    title = "·<b><br><br><br>level of organization</b>",
+    title = "·<b><br><br><br>Level of organization</b>",
     ticketmode = 'array',
     ticktext = c("Population", "Meta-<br>population", "Community", "Ecosystem"),
     tickvals = c(1, 2, 3, 4),
@@ -73,29 +74,6 @@ p<-plot_ly() %>%
 print(p)
 
 
-data(iris)
-head(iris)
-
-# x, y and z coordinates
-x <- sep.l <- iris$Sepal.Length
-y <- pet.l <- iris$Petal.Length
-z <- sep.w <- iris$Sepal.Width
-
-library("plot3D")
-scatter3D(scale_df$ss, scale_df$ts, scale_df$loo, bty = "g", pch = 18, 
-          col.var = scale_df$Name %>% as.factor() %>% as.integer(),
-          phi=20, theta=30,
-          cex=3
-          # col = c("#1B9E77", "#D95F02", "#7570B3"),
-          # pch = 18#,
-          # colkey = list(at = c(1, 2, 3, 4, 5), side = 1,
-          #               addlines = TRUE, length = 0.5, width = 0.5,
-          #               labels = scale_df$Name %>% unique() %>% sort())
-          )
-
-text3D(scale_df$ss, scale_df$ts, scale_df$loo,  labels = scale_df$Name,
-       phi=20, theta=30,
-       add = TRUE, colkey = FALSE, cex = 0.5)
 
 p <- plot_ly() %>%
   # the scatter plot of the data points 
