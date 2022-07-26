@@ -249,6 +249,7 @@ abundance_df<-data %>%
   arrange(species)
 
 summary_df<-full_join(sync_df, abundance_df %>% dplyr::select(-p),by=c("species", "management"))
+
 pdf(paste0(path, "output/summary.pdf"))
 p_summary<-ggplot(summary_df %>%
                     mutate(range=range*100) %>% 
@@ -264,6 +265,27 @@ p_summary<-ggplot(summary_df %>%
   theme_classic()+
   xlab("")+
   facet_wrap(.~var, scales = "free_y", labeller = labeller(var = label_wrap_gen(30)))+
+  ylab("")
+print(p_summary)
+dev.off()
+
+pdf(paste0(path, "output/summary more.pdf"), width = 8, height = 4)
+p_summary<-ggplot(summary_df %>%
+                    mutate(range=range*100) %>% 
+                    dplyr::select(species, management, 
+                                  Mean=mean,
+                                  `Range (km)`=range,
+                                  Upper=upper,
+                                  Lower=lower) %>% 
+                    tidyr::gather(key="var", value="value", -species, -management)  %>% 
+                    mutate(var=as.factor(var)) %>% 
+                    mutate(var=fct_relevel(var, levels=c("Mean", "Upper", "Lower", "Range (km)"))))+
+  geom_boxplot(aes(x=management, y=value))+
+  geom_point(aes(x=management, y=value), cex=2, col="red", pch=1)+
+  # geom_label_repel(aes(x=management, y=value, label=species), cex=3, col="red")+
+  theme_classic()+
+  xlab("")+
+  facet_wrap(.~var, scales = "free_y", labeller = labeller(var = label_wrap_gen(30)), nrow=1)+
   ylab("")
 print(p_summary)
 dev.off()

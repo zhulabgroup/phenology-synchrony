@@ -58,3 +58,30 @@ grid.arrange(annotate_figure(p_metric, fig.lab = "(a)"),
                                  c(2))
 )
 dev.off()
+
+
+
+prcp_df<-merged %>% 
+  dplyr::select(year=time, NE2_Tpp, NE3_Tpp, NE2_Dpp, NE3_Dpp) %>% 
+  tidyr::gather(key="sitedata", value="value", -year) %>% 
+  rowwise () %>% 
+  mutate(site=str_split(sitedata,pattern="_",simplify = T)[1]) %>% 
+  mutate(data=str_split(sitedata,pattern="_",simplify = T)[2]) %>% 
+  ungroup() %>% 
+  dplyr::select(-sitedata) %>% 
+  mutate(site=case_when(site=="NE2"~"IR",
+                        site=="NE3"~"RF")) %>% 
+  mutate(data=case_when(data=="Tpp"~"FLUXNET",
+                        data=="Dpp"~"Daymet")) %>% 
+  mutate(year=as.integer(year))
+
+pdf(paste0(path, 'output/precip.pdf'), width = 8, height = 4)
+ggplot(prcp_df)+
+  geom_line(aes(x=year, y=value, group=site, col=site), lwd=2)+
+  facet_wrap(.~data, nrow=1)+
+  theme_classic()+
+  ylab ("Total annual precipitation (mm)")+
+  xlab("Year")+
+  guides(col=guide_legend(title="Site"))+
+  scale_x_continuous(breaks= scales::pretty_breaks())
+dev.off()
