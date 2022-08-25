@@ -16,7 +16,7 @@ NE_df<-data.frame(NE2_table) %>%
 
 p_metric<-ggplot(NE_df)+
   geom_point(aes(x=site, y=Mean))+
-  geom_errorbar(aes(x=site, ymin=Mean-1.95*Stdev, ymax=Mean+1.95*Stdev))+
+  geom_errorbar(aes(x=site, ymin=Mean-1.95*Stdev, ymax=Mean+1.95*Stdev), width=0.3)+
   facet_wrap(.~metric, nrow=1, scales = "free_y")+
   theme_classic()+
   ylab("Value of phenological metric")+

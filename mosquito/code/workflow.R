@@ -159,8 +159,8 @@ p_corr
 p_summary<-ggplot()+
   geom_point(data=reg_df, aes(x=SciName, y=estimate))+
   geom_point(data=reg_df%>% filter(p<0.05), aes(x=SciName, y=estimate), col="blue")+
-  geom_errorbar(data=reg_df, aes(x=SciName, ymin=estimate-1.96*se, ymax=estimate+1.96*se))+
-  geom_errorbar(data=reg_df %>% filter(p<0.05), aes(x=SciName, ymin=estimate-1.96*se, ymax=estimate+1.96*se), col="blue")+
+  geom_errorbar(data=reg_df, aes(x=SciName, ymin=estimate-1.96*se, ymax=estimate+1.96*se), width=0.3)+
+  geom_errorbar(data=reg_df %>% filter(p<0.05), aes(x=SciName, ymin=estimate-1.96*se, ymax=estimate+1.96*se), col="blue", width=0.3)+
   geom_hline(yintercept = 0, lty=2)+
   theme_classic()+
   xlab("Species")+
