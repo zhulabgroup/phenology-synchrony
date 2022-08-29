@@ -77,11 +77,13 @@ prcp_df<-merged %>%
 
 pdf(paste0(path, 'output/precip.pdf'), width = 8, height = 4)
 ggplot(prcp_df)+
-  geom_line(aes(x=year, y=value, group=site, col=site), lwd=2)+
+  geom_line(aes(x=year, y=value, group=site, col=site, lty=site), lwd=1)+
+  scale_color_brewer(palette = "Set1")+
   facet_wrap(.~data, nrow=1)+
   theme_classic()+
   ylab ("Total annual precipitation (mm)")+
   xlab("Year")+
-  guides(col=guide_legend(title="Site"))+
+  guides(col=guide_legend(title="Site"),
+         lty="none")+
   scale_x_continuous(breaks= scales::pretty_breaks())
 dev.off()
