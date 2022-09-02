@@ -10,10 +10,9 @@ library(rstanarm)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
-library(here)
 
 # loading in the seasonal abundance data and r function
-load( here("Data", "Mosquito_Data_Clean.Rda" ) )
+load( paste0(path, "data/Mosquito_Data_Clean.Rda" ) )
 
 source( here("R_Script", "02_Synchrony_GAM_Function.R" ))
 

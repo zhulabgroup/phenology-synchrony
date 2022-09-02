@@ -4,17 +4,38 @@ library(ggpubr)
 library(nlme)
 
 path <- "./case study D: mosquito/"
-pred.df <- readRDS(paste0(path, "data/predict.rds")) %>% 
-  filter(Site !="HARV")
-pred1.df <- readRDS(paste0(path, "data/predict_year.rds"))
-pred3.df <- readRDS(paste0(path, "data/predict_long.rds")) %>% 
-  filter(Site != "HARV")
 
-full.df <- bind_rows(pred.df, pred1.df,pred3.df)
+source(paste0(path, "/GAM_Function.R"))
+
+if (!file.exists(paste0(path, "data/predict.rds"))) {
+  load( paste0(path, "data/Mosquito_Data_Clean.Rda" ) )
+  site_list<-c("WREF", "WOOD", "YELL", "UNDE", "HARV", "SERC", "ORNL", "TALL")
+  complete.df <- complete.df %>% group_by(SciName, Year, Site) %>% 
+    mutate( Total_Count = sum(Count))
+  mos.df <- complete.df %>% filter( SciName != "Wyeomyia sp."  &
+                                      SciName != "Psorophora sp."  & 
+                                      SciName != "Uranotaenia sp."  & 
+                                      SciName != "Mansonia sp."  &
+                                      SciName != "Culiseta sp."  &
+                                      SciName != "Culicidae sp."  &
+                                      SciName != "Culex sp."  &
+                                      SciName != "Anopheles sp."  &
+                                      SciName != "Aedes sp." ) 
+  pred_df_list<-vector(mode="list")
+  for (site in site_list) {
+    pred_df_list[[site]]<-pheno_gam(mos.df, Site = site)
+  }
+  pred_df<-bind_rows(pred_df_list)
+  write_rds(pred_df, paste0(path, "data/predict.rds"))
+  
+} else {
+  pred_df <- read_rds(paste0(path, "data/predict.rds"))
+}
+
 
 site_df<-read_csv(paste0(path, "/data/NEON_Field_Site_Metadata_20220412.csv")) %>% 
   dplyr::select(Site=field_site_id, lat=field_latitude, lon=field_longitude) %>% 
-  filter(Site %in% unique(full.df$Site))
+  filter(Site %in% unique(pred_df$Site))
 
 usa <- map("state", fill = TRUE)
 IDs <- sapply(strsplit(usa$names, ":"), function(x) x[1])
@@ -32,7 +53,7 @@ p_map<-ggplot()+
   # coord_equal()+
   coord_map("bonne", lat0 = 50)
 
-count.df <- full.df %>%
+count.df <- pred_df %>%
   group_by(Site, Year, SciName, DOY) %>% 
   summarise(
     Count = mean(Count)#,
