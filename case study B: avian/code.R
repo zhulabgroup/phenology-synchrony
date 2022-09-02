@@ -1,117 +1,218 @@
 #######################
-# 2 - analyze BBS data
+# 1 - process BBS data
 #######################
 
-# load packages -----------------------------------------------------------
 
-p_load(tidyverse)
-p_load(sf)
-p_load(bbsBayes)
-p_load(raster)
-p_load(rstanarm)
-p_load(raster)
-p_load(exactextractr)
-p_load(rnaturalearth)
-p_load(gridExtra)
-p_load(ggpubr)
-# load data ----------------------------------------------------------------
-path<-"./avian/"
-path_in<-paste0(path,"data/processed/")
-files<-list.files(path_in, full.names = T)
-m_data_list<-vector(mode="list", length=length(files))
-for (f in 1:length(files)) {
-  file<-files[f]
-  m_data_list[[f]]<-read_rds(file)
-  print(f)
-}
-data_p<-bind_rows(m_data_list)
-load(paste0(path, "data/bbs_raw_data.RData"))
+# load packages -----------------------------------------------------------
+# JAGS downloaded from https://sourceforge.net/projects/mcmc-jags/files/
+library(bbsBayes)
+library(tidyverse)
+
+
+# get data ----------------------------------------------------------------
+
+#only needs to be run once
+# fetch_bbs_data()
+path<-"./case study B: avian/"
+load(paste0(path,"data/bbs_raw_data.RData"))
+
 strat_data <- stratify(by = 'bbs_cws', bbs_data = bbs_data)
 
-#filter for only passerines
-spstrat <- strat_data$species_strat
-
+#process
 bstrat <- strat_data$bird_strat
+
+#routes are unique within each state (i.e., need to create new)
 RID_df <- bstrat %>%
   dplyr::distinct(statenum, Route) %>%
   dplyr::arrange(statenum, Route) %>%
   dplyr::mutate(RID = 1:NROW(.))
+
+#route info
 route_df <- strat_data$route_strat %>%
   dplyr::select(statenum, Route, RouteName,
                 Latitude, Longitude) %>%
   dplyr::distinct()
+
+#merge new RID (unique ID for each route, irrespective of state) with full data
 bstrat2 <- left_join(bstrat, RID_df, by = c('statenum', 'Route')) %>%
   left_join(route_df, by = c('statenum', 'Route')) %>%
   dplyr::mutate(log_count = log(SpeciesTotal)) %>%
   dplyr::arrange(RID, AOU, Year) %>%
   dplyr::select(RID, RouteName, AOU, Year, SpeciesTotal, log_count, BCR, Latitude, Longitude)
-uRID <- unique(bstrat2$RID)
 
-# time series plot
-tplt <- dplyr::left_join(data_p, spstrat, by = c('AOU' = 'sp.bbs')) %>%
+# #plot
+# bstrat2 %>%
+#   select(Latitude, Longitude) %>%
+#   distinct() %>%
+#   ggplot(aes(Longitude, Latitude)) +
+#   geom_point() +
+#   theme_bw()
+
+
+# process data -----------------------------------------------------------------
+
+#unique RIDs
+uRID <- unique(bstrat2$RID)
+file_list<-paste0(path, "data/processed/") %>% list.files(pattern = ".rds", full.names = T)
+if ( length(file_list)<54) {
+  #RESIDUALS MIGHT BE OFF (for route 5146 at least was 0)
+  #INCLUDE ALL SPECIES, NOT JUST COMPLETE TIME SERIES (determine what to do about zeros in time series) - can filter after using mean count, etc.
+  #MEAN WHEN MULTIPLE OBS PER YEAR
+  #at least 5 species for each RID
+  
+  library(foreach)
+  library(doSNOW)
+  num_cores <- 50
+  cl <- makeCluster(num_cores)
+  registerDoSNOW(cl)
+  m_data_list<-
+    foreach (i = 1:length(uRID),
+             .packages = c("tidyverse")) %dopar% {
+               #i <- 770
+               print(paste0('processing route: ', i, ' of ', length(uRID)))
+               #data for single route
+               r_data <- dplyr::filter(bstrat2, RID == uRID[i])
+               
+               #only species seen in all years
+               sp_keep1 <- r_data %>%
+                 dplyr::group_by(AOU) %>%
+                 dplyr::summarize(nyrs = length(unique(Year))) %>%
+                 dplyr::ungroup() %>%
+                 dplyr::filter(nyrs == length(unique(r_data$Year)))
+               
+               #filtered by 'abundant' species
+               r_data2 <- r_data %>%
+                 dplyr::filter(AOU %in% sp_keep1$AOU)
+               
+               # sp_keep1 <- data.frame(AOU = unique(r_data$AOU))
+               
+               #get mean count of each species across years
+               sp_keep2 <- r_data2 %>%
+                 dplyr::group_by(AOU) %>%
+                 dplyr::summarize(mn_count = mean(SpeciesTotal)) %>%
+                 dplyr::ungroup() %>%
+                 dplyr::arrange(AOU)
+               
+               r_data3 <- dplyr::left_join(r_data2, sp_keep2, by = 'AOU') %>%
+                 dplyr::arrange(AOU, Year)
+               # r_data2 <- r_data
+               
+               
+               #get residuals from linear regression (on log count)
+               resids <- r_data3 %>%
+                 group_by(AOU) %>%
+                 do(model = residuals(lm(log_count ~ Year, data = .)))
+               
+               #add to df
+               r_data3$residuals <- unlist(resids$model)
+               
+               if (NROW(r_data3) >= 5)
+               {
+                 r_data3
+               }
+             }
+  m_data<-bind_rows(m_data_list)
+  
+  # save RDS ----------------------------------------------------------------
+  year_list<-m_data %>% pull(Year) %>% unique()
+  path_out<-paste0(path, "data/processed/")
+  dir.create(path_out, recursive = T)
+  for (year in year_list) {
+    write_rds(m_data %>% filter(Year==year), paste0(path_out, year,'.rds'))
+    print(year)
+  }
+}
+
+m_data_list<-vector(mode="list")
+for (file in file_list) {
+  m_data_list[[file]]<-read_rds(file)
+}
+m_data<-bind_rows(m_data_list)
+
+
+#######################
+# 2 - analyze BBS data
+#######################
+
+# load packages -----------------------------------------------------------
+
+library(tidyverse)
+library(sf)
+library(bbsBayes)
+library(raster)
+library(rstanarm)
+library(raster)
+library(exactextractr)
+library(rnaturalearth)
+library(gridExtra)
+library(ggpubr)
+# load data ----------------------------------------------------------------
+
+#filter for only passerines
+spstrat <- strat_data$species_strat
+tplt <- dplyr::left_join(m_data, spstrat, by = c('AOU' = 'sp.bbs')) %>%
   dplyr::filter(order == 'Passeriformes') %>% 
   dplyr::filter(RID == uRID[1])
+
+# time series plot
 p_ts <- ggplot(tplt, aes(Year, residuals, color = factor(AOU))) +
   geom_line(alpha = 0.5) +
   theme_classic() +
   theme(legend.pos = 'none') +
   xlab('Year') +
   ylab('log (count) residuals') #+
-  # ggtitle(paste0("Site: ",tplt$RouteName[1], ' (', round(tplt$Latitude[1], 2), ', ', round(tplt$Longitude[1], 2), ')'))
 p_ts
 # stats data --------------------------------------------------------------
 
 
 
-
-
 # calculate mn corr and mean evenness for each route ---------------------------------------------------
 
-uRID <- data %>% pull(RID) %>% unique() %>% sort()
-
-p_load(foreach)
-p_load(doSNOW)
-num_cores <- 50
-cl <- makeCluster(num_cores)
-registerDoSNOW(cl)
-
-out_list<-
-foreach (i = 1:length(uRID),
-         .packages = c("tidyverse")) %dopar% {
-  #i <- 236
-  print(paste0('processing route: ', i, ' of ', length(uRID)))
+if (!file.exists(paste0(path, 'data/pro-cc.rds'))) {
+  library(foreach)
+  library(doSNOW)
+  num_cores <- 50
+  cl <- makeCluster(num_cores)
+  registerDoSNOW(cl)
   
-  fdat1 <- dplyr::filter(data, RID == uRID[i])
+  out_list<-
+    foreach (i = 1:length(uRID),
+             .packages = c("tidyverse")) %dopar% {
+               #i <- 236
+               print(paste0('processing route: ', i, ' of ', length(uRID)))
+               
+               fdat1 <- dplyr::filter(data, RID == uRID[i])
+               
+               #mean when multiple obs for a given AOU/year
+               fdat2 <- suppressMessages(fdat1 %>%
+                                           dplyr::group_by(AOU, Year) %>%
+                                           dplyr::summarize(log_count = mean(log_count), resid = mean(residuals),
+                                                            count = mean(SpeciesTotal)))
+               
+               #wide format
+               fdat_wide_rs <- fdat2 %>%
+                 dplyr::select(c(-log_count, -count)) %>%
+                 tidyr::pivot_wider(names_from = AOU, values_from = resid)
+               
+               #mean of corr matrix - community synchrony
+               cc_rs <- cor(fdat_wide_rs[,-1], use = 'pairwise.complete.obs')
+               
+               out <- data.frame(RID = uRID[i],
+                                 mn_cc_rs = mean(cc_rs[lower.tri(cc_rs)], na.rm = TRUE),
+                                 nsp = length(unique(fdat1$AOU)),
+                                 nyr = length(unique(fdat1$Year)),
+                                 lat = fdat1$Latitude[1],
+                                 lon = fdat1$Longitude[1],
+                                 BCR = fdat1$BCR[1])
+               out
+             }
+  out<-bind_rows(out_list)
   
-  #mean when multiple obs for a given AOU/year
-  fdat2 <- suppressMessages(fdat1 %>%
-    dplyr::group_by(AOU, Year) %>%
-    dplyr::summarize(log_count = mean(log_count), resid = mean(residuals),
-                     count = mean(SpeciesTotal)))
-  
-  #wide format
-  fdat_wide_rs <- fdat2 %>%
-    dplyr::select(c(-log_count, -count)) %>%
-    tidyr::pivot_wider(names_from = AOU, values_from = resid)
-  
-  #mean of corr matrix - community synchrony
-  cc_rs <- cor(fdat_wide_rs[,-1], use = 'pairwise.complete.obs')
-  
-  out <- data.frame(RID = uRID[i],
-                    mn_cc_rs = mean(cc_rs[lower.tri(cc_rs)], na.rm = TRUE),
-                    nsp = length(unique(fdat1$AOU)),
-                    nyr = length(unique(fdat1$Year)),
-                    lat = fdat1$Latitude[1],
-                    lon = fdat1$Longitude[1],
-                    BCR = fdat1$BCR[1])
-  out
+  #save RDS
+  write_rds(out, paste0(path, 'data/pro-cc.rds'))
+} else {
+  out<-read_rds(paste0(path, 'data/pro-cc.rds'))
 }
-out<-bind_rows(out_list)
-
-#save RDS
-write_rds(out, paste0(path, 'data/pro-cc.rds'))
-out<-read_rds(paste0(path, 'data/pro-cc.rds'))
-
 
 # plot cc on map ----------------------------------------------------------
 
@@ -189,7 +290,7 @@ pts_sp <- sp::SpatialPoints(cbind(out2$lon, out2$lat))
 sf_pts <- sf::st_as_sf(pts_sp)
 st_crs(sf_pts) <- 4326
 
-hfi <- terra::rast('./avian/data/wildareas-v3-2009-human-footprint-geotiff/wildareas-v3-2009-human-footprint.tif')
+hfi <- terra::rast(paste0(path, '/data/wildareas-v3-2009-human-footprint-geotiff/wildareas-v3-2009-human-footprint.tif'))
 sf_pts3 <- sf::st_transform(sf_pts, crs = crs(hfi)) %>%
   st_buffer(dist = 40000)
 eval3 <- exactextractr::exact_extract(hfi, sf_pts3, 
@@ -206,21 +307,24 @@ plt6 <- ggplot(out5, aes(x = HFI, y = mn_cc_rs, color = factor(BCR))) +
   ylab('Mean pairwise correlation coefficient') +
   geom_line(stat = 'smooth', method = 'lm', size = 3, alpha = 0.5)
 
-pdf('./avian/output/sync_hfi.pdf',width = 6, height = 4)
-print(plt6)
-dev.off()
+# pdf('./avian/output/sync_hfi.pdf',width = 6, height = 4)
+# print(plt6)
+# dev.off()
 
 out5$nsp <- as.numeric(out5$nsp)
 
-ff <- rstanarm::stan_gamm4(mn_cc_rs ~ s(nsp) + HFI,
-                         data = out5,
-                         chains = 4,
-                         cores = 4,
-                         control = list(adapt_delta = 0.99))
-MCMCvis::MCMCsummary(ff, round = 5)
-write_rds(ff, paste0(path, "data/mcmc.rds"))
+if (!file.exists(paste0(path, "data/mcmc.rds"))) {
+  ff <- rstanarm::stan_gamm4(mn_cc_rs ~ s(nsp) + HFI,
+                             data = out5,
+                             chains = 4,
+                             cores = 4,
+                             control = list(adapt_delta = 0.99))
+  MCMCvis::MCMCsummary(ff, round = 5)
+  write_rds(ff, paste0(path, "data/mcmc.rds"))
+} else {
+  ff<-read_rds( paste0(path, "data/mcmc.rds"))
+}
 
-ff<-read_rds( paste0(path, "data/mcmc.rds"))
 # check accuracy
 out5<-out5 %>% mutate(pred=predict(ff) )
 ggplot(out5)+
@@ -264,9 +368,9 @@ p_contour<- ggplot()+
   theme_classic()
 p_contour
 
-pdf('./avian/output/sync_nsp_hfi_contour.pdf', width = 4, height = 4)
-print(p_contour)
-dev.off()
+# pdf('./avian/output/sync_nsp_hfi_contour.pdf', width = 4, height = 4)
+# print(p_contour)
+# dev.off()
 
 pdf(paste0(path, 'output/ts_map_cont.pdf'), width = 12, height = 8)
 grid.arrange(annotate_figure(p_ts, fig.lab = "(a)"),
@@ -275,5 +379,7 @@ grid.arrange(annotate_figure(p_ts, fig.lab = "(a)"),
              layout_matrix=rbind(c(1,1),
                                  c(2,3),
                                  c(2,3))
-             )
+)
 dev.off()
+
+
