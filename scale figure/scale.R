@@ -1,9 +1,9 @@
 library(tidyverse)
 library(pracma)
 
-scale_dict <- read_csv("./scale figure/synchrony scale.csv", skip = 0, n_max = 5)
+scale_dict <- read_csv("./scale figure/synchrony scale.csv", skip = 0, n_max = 4)
 
-scale_df <- read_csv("./scale figure/synchrony scale.csv", skip = 8, col_select = 1:4) %>%
+scale_df <- read_csv("./scale figure/synchrony scale.csv", skip = 7, col_select = 1:4) %>%
   mutate(
     ss = ss * 2,
     ts = ts * 2
@@ -70,8 +70,8 @@ p <- plot_ly() %>%
     zaxis = list(
       title = "·<b><br><br><br>Level of organization</b>",
       ticketmode = "array",
-      ticktext = c("Population", "Meta-<br>population", "Community", "Ecosystem"),
-      tickvals = c(1, 2, 3, 4),
+      ticktext = c("Population","Community", "Ecosystem"),
+      tickvals = c(1, 2, 3),
       range = c(0, 5) # ,
       # titlefont = list(size = 15),
       # tickfont = list(size = 15),
