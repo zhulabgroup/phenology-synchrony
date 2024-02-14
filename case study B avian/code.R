@@ -5,6 +5,7 @@
 
 # load packages -----------------------------------------------------------
 # JAGS downloaded from https://sourceforge.net/projects/mcmc-jags/files/
+# devtools::install_github("bbsBayes/bbsBayes")
 library(bbsBayes)
 library(tidyverse)
 
