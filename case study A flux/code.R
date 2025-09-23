@@ -136,7 +136,7 @@ p_corr2 <- df_SOS %>%
   guides(col = "none")
 
 dir.create(paste0(path, "output/"))
-pdf(paste0(path, "output/metric_regression.pdf"), width = 8, height = 8)
+pdf(paste0(path, "output/ts_corr.pdf"), width = 8, height = 8)
 gridExtra::grid.arrange(ggpubr::annotate_figure(p_ts, fig.lab = "(a)"),
   ggpubr::annotate_figure(p_corr1, fig.lab = "(b)"),
   ggpubr::annotate_figure(p_corr2, fig.lab = "(c)"),
