@@ -113,7 +113,7 @@ p_corr1 <- df_SOS %>%
   theme_classic() +
   labs(
     x = parse(text = "Days~to~reach~15~degree*C~temperature"),
-    y = "Days to reach 50%\nlatent heat flux",
+    y = "Days to reach 50% maximum\nlatent heat flux",
     col = "Site"
   ) +
   guides(col = "none")
@@ -129,8 +129,8 @@ p_corr2 <- df_SOS %>%
   scale_color_viridis_d(option = "D", begin = 0.25, end = 0.75) +
   theme_classic() +
   labs(
-    x = "Days to reach 50% latent heat flux",
-    y = "Days to reach 50%\ngross primary productivity",
+    x = "Days to reach 50% maximum latent heat flux",
+    y = "Days to reach 50% maximum\ngross primary productivity",
     col = "Site"
   ) +
   guides(col = "none")
