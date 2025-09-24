@@ -14,7 +14,7 @@ library(tidyverse)
 
 # only needs to be run once
 # fetch_bbs_data()
-path <- "./case study B: avian/"
+path <- "./case study B avian/"
 load(paste0(path, "data/bbs_raw_data.RData"))
 
 strat_data <- stratify(by = "bbs_cws", bbs_data = bbs_data)
@@ -164,7 +164,7 @@ tplt <- dplyr::left_join(m_data, spstrat, by = c("AOU" = "sp.bbs")) %>%
 p_ts <- ggplot(tplt, aes(Year, residuals, color = factor(AOU))) +
   geom_line(alpha = 0.5) +
   theme_classic() +
-  theme(legend.pos = "none") +
+  theme(legend.position = "none") +
   xlab("Year") +
   ylab("log (count) residuals") #+
 p_ts
@@ -356,7 +356,7 @@ ggplot(out5) +
 cor(out5$mn_cc_rs, out5$pred)^2
 
 # Contour plot
-pred_y <- predict(ff, newdata = data.frame(nsp = mean(out5$nsp), HFI = 0:50))
+# pred_y <- predict(ff, newdata = data.frame(nsp = mean(out5$nsp), HFI = 0:50))
 
 axis_x <- seq(min(out5$nsp), max(out5$nsp), length.out = 50)
 axis_y <- seq(min(out5$HFI), max(out5$HFI), length.out = 50)
@@ -364,12 +364,14 @@ pro_lm_surface <- expand.grid(nsp = axis_x, HFI = axis_y, KEEP.OUT.ATTRS = F)
 pro_lm_surface$sc_p <- predict(ff, newdata = pro_lm_surface)
 
 p_contour <- ggplot() +
-  geom_point(data = out5 %>% mutate(rank = rank(mn_cc_rs)), aes(x = HFI, y = nsp, col = rank), alpha = 0.3) +
-  # geom_contour_filled(data=pro_lm_surface, aes(x=HFI, y=nsp, z=sc_p))+
-  geom_contour(data = pro_lm_surface, aes(x = HFI, y = nsp, z = sc_p)) +
-  metR::geom_label_contour(data = pro_lm_surface, aes(x = HFI, y = nsp, z = sc_p), skip = 0) +
-  ylab("Number of species") +
-  xlab("HFI") +
+  geom_contour_filled(data = pro_lm_surface, aes(y = HFI, x = nsp, z = sc_p), alpha = 0.5, show.legend = F) +
+  geom_point(data = out2 %>%
+    bind_cols(HFI = eval3) %>%
+    mutate(rank = rank(mn_cc_rs)), aes(y = HFI, x = nsp, col = rank), alpha = 0.3) +
+  # geom_contour(data = pro_lm_surface, aes( y= HFI, x = nsp, z = sc_p)) +
+  metR::geom_text_contour(data = pro_lm_surface, aes(y = HFI, x = nsp, z = sc_p), skip = 0, rotate = T, check_overlap = T, label.placer = metR::label_placer_fraction(0.9)) +
+  xlab("Number of species") +
+  ylab("HFI") +
   scale_color_viridis_c(
     breaks = out5 %>%
       mutate(rank = rank(mn_cc_rs)) %>%
@@ -389,15 +391,17 @@ p_contour <- ggplot() +
   # theme(legend.position="bottom")+
   # theme(legend.key.height= unit(0.5, 'cm'),
   #       legend.key.width= unit(1, 'cm'))+
-  theme_classic()
+  theme_classic() +
+  scale_y_continuous(limits = c(0, 50), expand = expansion(mult = c(0, 0.02))) +
+  scale_x_continuous(limits = c(min(out5$nsp), max(out5$nsp)), expand = expansion(mult = c(0, 0.02)))
 p_contour
 
 # pdf('./avian/output/sync_nsp_hfi_contour.pdf', width = 4, height = 4)
 # print(p_contour)
 # dev.off()
 
-pdf(paste0(path, "output/ts_map_cont.pdf"), width = 12, height = 8)
-grid.arrange(annotate_figure(p_ts, fig.lab = "(a)"),
+pdf(str_c(path, "output/ts_map_cont.pdf"), width = 12, height = 8)
+gridExtra::grid.arrange(annotate_figure(p_ts, fig.lab = "(a)"),
   annotate_figure(p_map, fig.lab = "(b)"),
   annotate_figure(p_contour, fig.lab = "(c)"),
   layout_matrix = rbind(

@@ -104,15 +104,15 @@ full.df <- rbind.data.frame(pred.df, pred1.df, pred3.df)
 
 # full.df$SiteYear <- paste(full.df$Site, full.df$Year)
 
-shannon.df<-full.df %>%
+shannon.df <- full.df %>%
   group_by(Site, Year, SciName, DOY) %>%
   summarise(
     Count = mean(Count)
   ) %>%
-  ungroup() %>% 
-  group_by(Site, Year, DOY) %>% 
-  summarise(shannon=diversity(as.matrix(Count), index = "shannon")) %>% 
-  mutate(Site=factor(Site, levels = c("HARV", "SERC", "ORNL", "TALL")))
+  ungroup() %>%
+  group_by(Site, Year, DOY) %>%
+  summarise(shannon = diversity(as.matrix(Count), index = "shannon")) %>%
+  mutate(Site = factor(Site, levels = c("HARV", "SERC", "ORNL", "TALL")))
 
 shannon.df %>%
   filter(Site != "ORNL" & Site != "SERC" & Site != "TALL" & Site != "WREF" & Site != "YELL") %>%
@@ -134,5 +134,5 @@ shannon.df %>%
     axis.text.y = element_text(vjust = 0.5, color = "black"),
     axis.title.y = element_text(size = rel(1.8), angle = 90),
     strip.text.x = element_text(size = 20)
-  )+
-  facet_wrap(.~Site)
+  ) +
+  facet_wrap(. ~ Site)

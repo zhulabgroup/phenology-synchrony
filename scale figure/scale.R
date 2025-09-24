@@ -70,7 +70,7 @@ p <- plot_ly() %>%
     zaxis = list(
       title = "·<b><br><br><br>Level of organization</b>",
       ticketmode = "array",
-      ticktext = c("Population","Community", "Ecosystem"),
+      ticktext = c("Population", "Community", "Ecosystem"),
       tickvals = c(1, 2, 3),
       range = c(0, 5) # ,
       # titlefont = list(size = 15),

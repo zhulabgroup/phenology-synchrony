@@ -12,7 +12,7 @@ library(geosphere)
 library(tsibble)
 library(fable)
 
-path <- "./case study C: marine/"
+path <- "./case study C marine/"
 data <- read_csv(paste0(path, "data/bethany_bottomtrawl_fall.csv")) %>%
   dplyr::select(-SEASON, -name, -LAT, -LON) %>%
   tidyr::gather(key = "species", value = "CPUE", -YEAR, -STRATUM, -NTOWS, -midlat, -midlon, -group) %>%
