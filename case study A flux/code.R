@@ -101,13 +101,39 @@ p_ts <- df_combined %>%
   theme_classic() +
   labs(x = "Time", y = "", col = "Site")
 
+# Create a function to get slope and p-value from rlm
+get_rlm_label <- function(df, xvar, yvar) {
+  fit <- MASS::rlm(as.formula(paste(yvar, "~", xvar)), data = df)
+
+  coef_val <- coef(fit)[2]
+
+  p_val <- sfsmisc::f.robftest(fit)$p.value
+
+  label <- str_c(
+    "italic(beta)~'='~", round(coef_val, 2),
+    "*', '*italic(p)~'='~", signif(p_val, 3)
+  )
+
+  label
+}
+
 p_corr1 <- df_SOS %>%
   select(-date, -variable_unit) %>%
   pivot_wider(names_from = variable, values_from = doy) %>%
   ggplot(aes(x = temp, y = le, col = site)) +
-  geom_point() +
   geom_smooth(method = MASS::rlm, se = T) +
-  ggpubr::stat_cor(aes(x = temp, y = le), label.x.npc = 0.1, label.y.npc = 0.15, show.legend = F, inherit.aes = F) +
+  geom_point() +
+  geom_text(
+    data = . %>%
+      group_by(site) %>%
+      nest() %>%
+      mutate(label = map_chr(data, ~ get_rlm_label(.x, "temp", "le"))) %>%
+      select(site, label) %>%
+      ungroup(),
+    aes(x = 130, y = 140, label = label),
+    hjust = 0, vjust = 1,
+    parse = T
+  ) +
   scale_color_viridis_d(option = "D", begin = 0.25, end = 0.75) +
   facet_wrap(. ~ site) +
   theme_classic() +
@@ -122,9 +148,19 @@ p_corr2 <- df_SOS %>%
   select(-date, -variable_unit) %>%
   pivot_wider(names_from = variable, values_from = doy) %>%
   ggplot(aes(x = le, y = gpp, col = site)) +
-  geom_point() +
   geom_smooth(method = MASS::rlm, se = T) +
-  ggpubr::stat_cor(aes(x = le, y = gpp), label.x.npc = 0.1, label.y.npc = 0.05, show.legend = F, inherit.aes = F) +
+  geom_point() +
+  geom_text(
+    data = . %>%
+      group_by(site) %>%
+      nest() %>%
+      mutate(label = map_chr(data, ~ get_rlm_label(.x, "le", "gpp"))) %>%
+      select(site, label) %>%
+      ungroup(),
+    aes(x = 135, y = 165, label = label),
+    hjust = 0, vjust = 1,
+    parse = T
+  ) +
   facet_wrap(. ~ site) +
   scale_color_viridis_d(option = "D", begin = 0.25, end = 0.75) +
   theme_classic() +
@@ -135,7 +171,7 @@ p_corr2 <- df_SOS %>%
   ) +
   guides(col = "none")
 
-dir.create(paste0(path, "output/"))
+dir.create(str_c(path, "output/"))
 pdf(paste0(path, "output/ts_corr.pdf"), width = 8, height = 8)
 gridExtra::grid.arrange(ggpubr::annotate_figure(p_ts, fig.lab = "(a)"),
   ggpubr::annotate_figure(p_corr1, fig.lab = "(b)"),
