@@ -231,6 +231,29 @@ management <- c(
   0, 1, 1, 1, 1,
   0
 )
+
+management_df <- data.frame(sp = sp_list, management) %>%
+  rowwise() %>%
+  mutate(
+    Genus = str_split(sp, "_", simplify = T)[1],
+    Species = str_split(sp, "_", simplify = T)[2],
+    `Common Name` = sp %>%
+      str_replace(Genus, "") %>%
+      str_replace(Species, "") %>%
+      str_replace("__", "") %>%
+      str_replace_all("_", " "),
+  ) %>%
+  ungroup() %>%
+  mutate(`Scientific Name` = paste(Genus, Species)) %>%
+  mutate(
+    Management = case_when(
+      management == 0 ~ "unmanaged",
+      management == 1 ~ "managed"
+    )
+  ) %>%
+  select(`Scientific Name`, `Common Name`, Management)
+
+write_csv(management_df, paste0(path, "output/species_management.csv"))
 # https://media.fisheries.noaa.gov/2021-04/Mid-Atlantic-Managed-Species.pdf
 # https://media.fisheries.noaa.gov/2021-04/New-England-Managed-Species.pdf
 # https://www.fisheries.noaa.gov/new-england-mid-atlantic/population-assessments/fishery-stock-assessments-new-england-and-mid-atlantic
