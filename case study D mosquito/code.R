@@ -3,7 +3,7 @@ library(gridExtra)
 library(ggpubr)
 library(nlme)
 
-path <- "./case study D: mosquito/"
+path <- "./case study D mosquito/"
 
 source(paste0(path, "/GAM_Function.R"))
 
@@ -37,9 +37,9 @@ site_df <- read_csv(paste0(path, "/data/NEON_Field_Site_Metadata_20220412.csv"))
   dplyr::select(Site = field_site_id, lat = field_latitude, lon = field_longitude) %>%
   filter(Site %in% unique(pred_df$Site))
 
-usa <- map("state", fill = TRUE)
+usa <- maps::map("state", fill = TRUE)
 IDs <- sapply(strsplit(usa$names, ":"), function(x) x[1])
-usa <- map2SpatialPolygons(usa, IDs = IDs, proj4string = CRS("+proj=longlat +datum=WGS84"))
+usa <- maptools::map2SpatialPolygons(usa, IDs = IDs, proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
 p_map <- ggplot() +
   geom_polygon(
     data = usa, aes(x = long, y = lat, group = group),
@@ -49,7 +49,7 @@ p_map <- ggplot() +
     data = site_df,
     aes(x = lon, y = lat)
   ) +
-  geom_label_repel(
+  ggrepel::geom_label_repel(
     data = site_df,
     aes(x = lon, y = lat, label = Site)
   ) +
